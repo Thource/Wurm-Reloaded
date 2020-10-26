@@ -1,0 +1,137 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=4
+
+_global_script_classes=[ {
+"base": "Reference",
+"class": "BML",
+"language": "GDScript",
+"path": "res://scripts/BML.gd"
+}, {
+"base": "Reference",
+"class": "BMLButton",
+"language": "GDScript",
+"path": "res://scripts/BMLButton.gd"
+}, {
+"base": "Reference",
+"class": "BMLDropdown",
+"language": "GDScript",
+"path": "res://scripts/BMLDropdown.gd"
+}, {
+"base": "Reference",
+"class": "BMLParser",
+"language": "GDScript",
+"path": "res://scripts/BMLParser.gd"
+}, {
+"base": "Reference",
+"class": "BMLPassThrough",
+"language": "GDScript",
+"path": "res://scripts/BMLPassThrough.gd"
+}, {
+"base": "Reference",
+"class": "BMLRadio",
+"language": "GDScript",
+"path": "res://scripts/BMLRadio.gd"
+}, {
+"base": "Reference",
+"class": "ConnectionHandler",
+"language": "GDScript",
+"path": "res://scripts/ConnectionHandler.gd"
+}, {
+"base": "Reference",
+"class": "EncryptionService",
+"language": "GDScript",
+"path": "res://scripts/EncryptionService.gd"
+}, {
+"base": "Reference",
+"class": "ExtendedPoolByteArray",
+"language": "GDScript",
+"path": "res://scripts/ExtendedPoolByteArray.gd"
+}, {
+"base": "Reference",
+"class": "GDUnzip",
+"language": "GDScript",
+"path": "res://scripts/GDUnzip.gd"
+}, {
+"base": "Reference",
+"class": "Logger",
+"language": "GDScript",
+"path": "res://scripts/Logger.gd"
+}, {
+"base": "Reference",
+"class": "OverflowService",
+"language": "GDScript",
+"path": "res://scripts/OverflowService.gd"
+}, {
+"base": "Reference",
+"class": "Player",
+"language": "GDScript",
+"path": "res://scripts/Player.gd"
+}, {
+"base": "Reference",
+"class": "Random",
+"language": "GDScript",
+"path": "res://scripts/Random.gd"
+}, {
+"base": "Reference",
+"class": "ResourceResolver",
+"language": "GDScript",
+"path": "res://scripts/ResourceResolver.gd"
+}, {
+"base": "Reference",
+"class": "StringTokenizer",
+"language": "GDScript",
+"path": "res://scripts/StringTokenizer.gd"
+}, {
+"base": "Reference",
+"class": "WOMLoader",
+"language": "GDScript",
+"path": "res://scripts/WOMLoader.gd"
+}, {
+"base": "Reference",
+"class": "WOMModel",
+"language": "GDScript",
+"path": "res://scripts/WOMModel.gd"
+}, {
+"base": "Reference",
+"class": "WurmWorld",
+"language": "GDScript",
+"path": "res://scripts/WurmWorld.gd"
+} ]
+_global_script_class_icons={
+"BML": "",
+"BMLButton": "",
+"BMLDropdown": "",
+"BMLParser": "",
+"BMLPassThrough": "",
+"BMLRadio": "",
+"ConnectionHandler": "",
+"EncryptionService": "",
+"ExtendedPoolByteArray": "",
+"GDUnzip": "",
+"Logger": "",
+"OverflowService": "",
+"Player": "",
+"Random": "",
+"ResourceResolver": "",
+"StringTokenizer": "",
+"WOMLoader": "",
+"WOMModel": "",
+"WurmWorld": ""
+}
+
+[application]
+
+config/name="WurmReloaded"
+run/main_scene="res://DataImport.tscn"
+config/icon="res://icon.png"
+
+[rendering]
+
+environment/default_environment="res://default_env.tres"
