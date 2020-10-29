@@ -12,7 +12,7 @@ var raw_wurm_time_seconds: int
 func _ready():
   pass
 
-func _process(delta):
+func _process(_delta):
   pass
 
 func create_player() -> Player:
@@ -20,8 +20,8 @@ func create_player() -> Player:
   players_container.add_child(player)
   return player
 
-func set_world_size(size: int):
-  self.size = size
+func set_world_size(_size: int):
+  self.size = _size
 
 func set_initial_wurm_time(time: int):
   self.time_ticks = 0

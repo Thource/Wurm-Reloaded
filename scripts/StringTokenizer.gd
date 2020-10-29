@@ -26,11 +26,9 @@ func _set_max_delim_code_point() -> void:
   
   var m := 0
   var c: int
-  var count := 0
   for i in range(_delimiters.length()):
     c = ord(_delimiters[i])
     if m < c: m = c
-    count += 1
   
   _max_delim_code_point = m
 

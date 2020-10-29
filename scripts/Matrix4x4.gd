@@ -17,33 +17,27 @@ var m31: float
 var m32: float
 var m33: float
 
-func _init(m00: float, m01: float, m02: float, m03: float,
-           m10: float, m11: float, m12: float, m13: float,
-           m20: float, m21: float, m22: float, m23: float,
-           m30: float, m31: float, m32: float, m33: float):
-  self.m00 = m00
-  self.m01 = m01
-  self.m02 = m02
-  self.m03 = m03
-  self.m10 = m10
-  self.m11 = m11
-  self.m12 = m12
-  self.m13 = m13
-  self.m20 = m20
-  self.m21 = m21
-  self.m22 = m22
-  self.m23 = m23
-  self.m30 = m30
-  self.m31 = m31
-  self.m32 = m32
-  self.m33 = m33
+func _init(_m00: float, _m01: float, _m02: float, _m03: float, _m10: float, _m11: float, _m12: float, _m13: float,
+           _m20: float, _m21: float, _m22: float, _m23: float, _m30: float, _m31: float, _m32: float, _m33: float):
+  self.m00 = _m00
+  self.m01 = _m01
+  self.m02 = _m02
+  self.m03 = _m03
+  self.m10 = _m10
+  self.m11 = _m11
+  self.m12 = _m12
+  self.m13 = _m13
+  self.m20 = _m20
+  self.m21 = _m21
+  self.m22 = _m22
+  self.m23 = _m23
+  self.m30 = _m30
+  self.m31 = _m31
+  self.m32 = _m32
+  self.m33 = _m33
 
 func get_scale() -> Vector3:
-  return Vector3(
-    Vector3(m00, m10, m20).length(),
-    Vector3(m01, m11, m21).length(),
-    Vector3(m02, m12, m22).length()
-   )
+  return Vector3(Vector3(m00, m10, m20).length(), Vector3(m01, m11, m21).length(), Vector3(m02, m12, m22).length())
 
 func get_position() -> Vector3:
   return Vector3(m03, m13, m23)

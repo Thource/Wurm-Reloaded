@@ -9,16 +9,15 @@ var blood_kingdom_id: int
 func _ready():
   pass
 
-func _process(delta):
+func _process(_delta):
   pass
 
-func teleport_to(x: float, h: float, y: float, y_rot: float, local: bool, 
-                layer: int, disembark: bool, command_type: int, 
-                login_teleport: bool, teleport_counter: int):
+func teleport_to(x: float, h: float, y: float, y_rot: float, local: bool, layer: int, disembark: bool,
+                 command_type: int, login_teleport: bool, teleport_counter: int):
   transform.origin = Vector3(x * 4.0, h, y * 4.0)
 
 func set_model(model_name: String):
-  add_child(ResourceResolver.load_model(model_name))
+  add_child(resource_resolver.load_model(model_name))
 
 func set_ground_offset(offset: int, immediate: bool, update_server: bool):
   pass

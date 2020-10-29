@@ -2,10 +2,10 @@ class_name OverflowService
 
 static func _as(num: int, bits: int) -> int:
   while num >= pow(2, bits - 1):
-    num -= pow(2, bits)
+    num -= pow(2, bits) as int
   
   while num < -pow(2, bits - 1):
-    num += pow(2, bits)
+    num += pow(2, bits) as int
     
   return num
 

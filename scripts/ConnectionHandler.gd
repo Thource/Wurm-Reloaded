@@ -34,17 +34,17 @@ func connect_to_server(ip_address: String, port: int, server_password: String, u
   
   var err := stream_peer.connect_to_host(ip_address, port)
   if err != OK:
-    Logger.error('Failed to connect to server. (' + str(err) + ')')
+    logger.error('Failed to connect to server. (' + str(err) + ')')
     return
   
-  Logger.info('Connecting to server ' + ip_address + ':' + str(port) + ' as ' + username + '.')
+  logger.info('Connecting to server ' + ip_address + ':' + str(port) + ' as ' + username + '.')
   while(stream_peer.get_status() == stream_peer.STATUS_CONNECTING):
     OS.delay_msec(100)
   
   if (stream_peer.get_status() == stream_peer.STATUS_ERROR):
-    Logger.error('An error occurred while connecting to server.')
+    logger.error('An error occurred while connecting to server.')
     return
-  Logger.info('Connected to server.')
+  logger.info('Connected to server.')
 
   stream_peer.big_endian = true
   stream_peer.set_no_delay(true)
@@ -125,7 +125,7 @@ func _recv_steam_auth(buf: ExtendedStreamPeerBuffer):
   if !success:
     var err_msg := buf.get_string_16()
     
-    Logger.debug_extreme('STEAM AUTH FAILED. ' + err_msg)
+    logger.debug_extreme('STEAM AUTH FAILED. ' + err_msg)
     return
 
   _send_login()
@@ -136,7 +136,7 @@ func _recv_login(buf: ExtendedStreamPeerBuffer):
   var login_status := buf.get_string_16()
   
   if !success:
-    Logger.debug_extreme('LOGIN FAILED. ' + login_status)
+    logger.debug_extreme('LOGIN FAILED. ' + login_status)
     return
   
   var layer := buf.get_8()
@@ -171,25 +171,25 @@ func _recv_login(buf: ExtendedStreamPeerBuffer):
 
 func _recv_set_status(buf: ExtendedStreamPeerBuffer):
   var status := buf.get_string_8()
-  Logger.debug_extreme('SET_STATUS status: ' + status)
+  logger.debug_extreme('SET_STATUS status: ' + status)
 
 func _recv_set_item_is_empty(buf: ExtendedStreamPeerBuffer):
   var inventory_id := buf.get_64()
   var item_id := buf.get_64()
-  Logger.debug_extreme('SET_ITEM_IS_EMPTY inventory_id: ' + str(inventory_id) + ', item_id: ' + str(item_id))
+  logger.debug_extreme('SET_ITEM_IS_EMPTY inventory_id: ' + str(inventory_id) + ', item_id: ' + str(item_id))
 
 func _recv_set_fight_style(buf: ExtendedStreamPeerBuffer):
   var style := buf.get_8()
-  Logger.debug_extreme('SET_FIGHT_STYLE style: ' + str(style))
+  logger.debug_extreme('SET_FIGHT_STYLE style: ' + str(style))
 
 func _recv_set_item_has_items(buf: ExtendedStreamPeerBuffer):
   var inventory_id := buf.get_64()
   var item_id := buf.get_64()
-  Logger.debug_extreme('SET_ITEM_HAS_ITEMS inventory_id: ' + str(inventory_id) + ', item_id: ' + str(item_id))
+  logger.debug_extreme('SET_ITEM_HAS_ITEMS inventory_id: ' + str(inventory_id) + ', item_id: ' + str(item_id))
 
 func _recv_set_speed_modifier(buf: ExtendedStreamPeerBuffer):
   var mod := buf.get_float()
-  Logger.debug_extreme('SET_SPEED_MODIFIER mod: ' + str(mod))
+  logger.debug_extreme('SET_SPEED_MODIFIER mod: ' + str(mod))
 
 func _recv_update_inventory_item(buf: ExtendedStreamPeerBuffer):
   var inventory_id := buf.get_64()
@@ -220,7 +220,7 @@ func _recv_update_inventory_item(buf: ExtendedStreamPeerBuffer):
   var rarity := buf.get_8()
   var material := buf.get_8()
   var image_number := buf.get_16()
-  Logger.debug_extreme('UPDATE_INVENTORY_ITEM inventory_id: ' + str(inventory_id) + ', item_id: ' + str(item_id) + 
+  logger.debug_extreme('UPDATE_INVENTORY_ITEM inventory_id: ' + str(inventory_id) + ', item_id: ' + str(item_id) + 
     ', parent_id: ' + str(parent_id) + ', name: ' + name + ', description: ' + description + 
     ', quality: ' + str(quality) + ', damage: ' + str(damage) + ', weight: ' + str(weight) + ', r: ' + str(r) + 
     ', g: ' + str(g) + ', b: ' + str(b) + ', price: ' + str(price) + 
@@ -259,7 +259,7 @@ func _recv_add_to_inventory(buf: ExtendedStreamPeerBuffer):
   var temperature := buf.get_8()
   var rarity := buf.get_8()
   var aux_data := buf.get_8()
-  Logger.debug_extreme('ADD_TO_INVENTORY inventory_id: ' + str(inventory_id) + ', item_id: ' + str(item_id) + 
+  logger.debug_extreme('ADD_TO_INVENTORY inventory_id: ' + str(inventory_id) + ', item_id: ' + str(item_id) + 
     ', parent_id: ' + str(parent_id) + ', name: ' + name + ', description: ' + description + 
     ', quality: ' + str(quality) + ', damage: ' + str(damage) + ', weight: ' + str(weight) + ', r: ' + str(r) + 
     ', g: ' + str(g) + ', b: ' + str(b) + ', price: ' + str(price) + 
@@ -274,7 +274,7 @@ func _recv_message(buf: ExtendedStreamPeerBuffer):
   var b := buf.get_8()
   var message := buf.get_string_16()
   var message_type := buf.get_8()
-  Logger.debug_extreme('MESSAGE window: ' + window + ', r: ' + str(r) + ', g: ' + str(g) + ', b: ' + str(b) +
+  logger.debug_extreme('MESSAGE window: ' + window + ', r: ' + str(r) + ', g: ' + str(g) + ', b: ' + str(b) +
     ', message: ' + message + ', message_type: ' + str(message_type))
 
 class BMLData:
@@ -353,7 +353,7 @@ func _recv_toggle_switch(buf: ExtendedStreamPeerBuffer):
   var toggle := buf.get_u8()
   var value := buf.get_u8()
   
-  Logger.debug_extreme('TOGGLE_SWITCH toggle: ' + str(toggle) +', value: ' + str(value))
+  logger.debug_extreme('TOGGLE_SWITCH toggle: ' + str(toggle) +', value: ' + str(value))
 
 func _recv_set_skill(buf: ExtendedStreamPeerBuffer):
   var parent_id := buf.get_64()
@@ -363,7 +363,7 @@ func _recv_set_skill(buf: ExtendedStreamPeerBuffer):
   var max_value := buf.get_float()
   var affinities := buf.get_8()
   
-  Logger.debug_extreme('SET_SKILL parent_id: ' + str(parent_id) + ', id: ' + str(id) + ', name: ' + name +
+  logger.debug_extreme('SET_SKILL parent_id: ' + str(parent_id) + ', id: ' + str(id) + ', name: ' + name +
     ', value: ' + str(value) + ', max_value: ' + str(max_value) + ', affinities: ' + str(affinities))
 
 func _recv_send_map_info(buf: ExtendedStreamPeerBuffer):
@@ -371,7 +371,7 @@ func _recv_send_map_info(buf: ExtendedStreamPeerBuffer):
   var cluster := buf.get_8()
   var is_epic := cluster != 0
   
-  Logger.debug_extreme('SEND_MAP_INFO server_name: ' + server_name + ', cluster: ' + str(cluster) + 
+  logger.debug_extreme('SEND_MAP_INFO server_name: ' + server_name + ', cluster: ' + str(cluster) + 
     ', is_epic: ' + str(is_epic))
 
 func _recv_map_annotations(buf: ExtendedStreamPeerBuffer):
@@ -390,7 +390,7 @@ func _recv_map_annotations(buf: ExtendedStreamPeerBuffer):
         var annotation_name := buf.get_string_16()
         var icon_id := buf.get_8()
         
-        Logger.debug_extreme('MAP_ANNOTATION ADD id: ' + str(id) + ', type: ' + str(type) + 
+        logger.debug_extreme('MAP_ANNOTATION ADD id: ' + str(id) + ', type: ' + str(type) + 
           ', server_name: ' + server_name + ', x: ' + str(x) + ', y: ' + str(y) + 
           ', annotation_name: ' + annotation_name + ', icon_id: ' + str(icon_id))
     1:
@@ -398,18 +398,18 @@ func _recv_map_annotations(buf: ExtendedStreamPeerBuffer):
       var type := buf.get_8()
       var server_name := buf.get_string_16()
       
-      Logger.debug_extreme('MAP_ANNOTATION REMOVE id: ' + str(id) + ', type: ' + str(type) + 
+      logger.debug_extreme('MAP_ANNOTATION REMOVE id: ' + str(id) + ', type: ' + str(type) + 
         ', server_name: ' + server_name)
     2:
       var has_village_permission := buf.get_8() != 0
       var has_alliance_permission := buf.get_8() != 0
       
-      Logger.debug_extreme('MAP_ANNOTATION PERMISSIONS has_village_permission: ' + str(has_village_permission) +
+      logger.debug_extreme('MAP_ANNOTATION PERMISSIONS has_village_permission: ' + str(has_village_permission) +
         ', has_alliance_permission: ' + str(has_alliance_permission))
     3:
       var type := buf.get_8()
       
-      Logger.debug_extreme('MAP_ANNOTATION CLEAR_TYPE type: ' + str(type))
+      logger.debug_extreme('MAP_ANNOTATION CLEAR_TYPE type: ' + str(type))
 
 func _recv_ticket_add(buf: ExtendedStreamPeerBuffer):
   var num := buf.get_32()
@@ -421,7 +421,7 @@ func _recv_ticket_add(buf: ExtendedStreamPeerBuffer):
     var colour_code := buf.get_8()
     var description := buf.get_string_16()
     
-    Logger.debug_extreme('TICKET_ADD ticket_no: ' + str(ticket_no) + ', ticket_group_id: ' + str(ticket_group_id) +
+    logger.debug_extreme('TICKET_ADD ticket_no: ' + str(ticket_no) + ', ticket_group_id: ' + str(ticket_group_id) +
       ', message: ' + message + ', colour_code: ' + str(colour_code) + ', description: ' + description)
     
     var num_actions := buf.get_8()
@@ -431,12 +431,12 @@ func _recv_ticket_add(buf: ExtendedStreamPeerBuffer):
       var msg := buf.get_string_8()
       var desc := buf.get_string_8()
       
-      Logger.debug_extreme('TICKET_ADD ACTION action_no: ' + str(action_no) + ', msg: ' + msg + ', desc: ' + desc)
+      logger.debug_extreme('TICKET_ADD ACTION action_no: ' + str(action_no) + ', msg: ' + msg + ', desc: ' + desc)
 
 func _recv_update_friends_list(buf: ExtendedStreamPeerBuffer):
   var player_status := buf.get_8()
   if buf.get_available_bytes() == 0 && player_status == 4:
-    Logger.debug_extreme('UPDATE_FRIENDS_LIST CLEAR_LIST')
+    logger.debug_extreme('UPDATE_FRIENDS_LIST CLEAR_LIST')
   else:
     var player_name := buf.get_string_8()
     var last_seen := buf.get_64()
@@ -446,7 +446,7 @@ func _recv_update_friends_list(buf: ExtendedStreamPeerBuffer):
     if has_note:
       note = buf.get_string_8()
     
-    Logger.debug_extreme('UPDATE_FRIENDS_LIST UPDATE player_name: ' + player_name + ', last_seen: ' + str(last_seen) +
+    logger.debug_extreme('UPDATE_FRIENDS_LIST UPDATE player_name: ' + player_name + ', last_seen: ' + str(last_seen) +
       ', player_server: ' + player_server + ', note: ' + note)
 
 func _recv_weather_update(buf: ExtendedStreamPeerBuffer):
@@ -456,14 +456,14 @@ func _recv_weather_update(buf: ExtendedStreamPeerBuffer):
   var wind_rot := buf.get_float()
   var wind_power := buf.get_float()
   
-  Logger.debug_extreme('WEATHER UPDATE cloudiness: ' + str(cloudiness) + ', fog: ' + str(fog) + ', rain: ' + str(rain) +
+  logger.debug_extreme('WEATHER UPDATE cloudiness: ' + str(cloudiness) + ', fog: ' + str(fog) + ', rain: ' + str(rain) +
     ', wind_rot: ' + str(wind_rot) + ', wind_power: ' + str(wind_power))
 
 func _recv_item_model_name(buf: ExtendedStreamPeerBuffer):
   var item_id := buf.get_32()
   var model_name := buf.get_string_8()
   
-  Logger.debug_extreme('ITEM_MODEL_NAME item_id: ' + str(item_id) + ', model_name: ' + model_name)
+  logger.debug_extreme('ITEM_MODEL_NAME item_id: ' + str(item_id) + ', model_name: ' + model_name)
 
 func _recv_add_clothing(buf: ExtendedStreamPeerBuffer):
   var wurm_id := buf.get_64()
@@ -487,14 +487,14 @@ func _recv_add_clothing(buf: ExtendedStreamPeerBuffer):
   var material := buf.get_8()
   var rarity := buf.get_8()
   
-  Logger.debug_extreme('ADD_CLOTHING wurm_id: ' + str(wurm_id) + ', item_id: ' + str(item_id) +
+  logger.debug_extreme('ADD_CLOTHING wurm_id: ' + str(wurm_id) + ', item_id: ' + str(item_id) +
     ', body_part: ' + str(body_part) + ', r: ' + str(r) + ', g: ' + str(g) + ', b: ' + str(b) + ', r1: ' + str(r1) +
     ', g1: ' + str(g1) + ', b1: ' + str(b1) + ', material: ' + str(material) + ', rarity: ' + str(rarity))
 
 func _recv_climb(buf: ExtendedStreamPeerBuffer):
   var should_climb := buf.get_8() != 0
   
-  Logger.debug_extreme('CLIMB should_climb: ' + str(should_climb))
+  logger.debug_extreme('CLIMB should_climb: ' + str(should_climb))
 
 func _recv_new_achievement(buf: ExtendedStreamPeerBuffer):
   var is_new := buf.get_8() == 1
@@ -506,7 +506,7 @@ func _recv_new_achievement(buf: ExtendedStreamPeerBuffer):
   var time_achieved := buf.get_64()
   var counter := buf.get_32()
   
-  Logger.debug_extreme('NEW_ACHIEVEMENT is_new: ' + str(is_new) +
+  logger.debug_extreme('NEW_ACHIEVEMENT is_new: ' + str(is_new) +
     ', should_play_sound_on_update: ' + str(should_play_sound_on_update) + ', id: ' + str(id) + ', name: ' + name +
     ', description: ' + description + ', type: ' + str(type) + ', time_achieved: ' + str(time_achieved) +
     ', counter: ' + str(counter))
@@ -516,13 +516,13 @@ func _recv_join_group(buf: ExtendedStreamPeerBuffer):
   var name := buf.get_string_8()
   var player_id := buf.get_64()
   
-  Logger.debug_extreme('JOIN_GROUP group: ' + group + ', name: ' + name + ', player_id: ' + str(player_id))
+  logger.debug_extreme('JOIN_GROUP group: ' + group + ', name: ' + name + ', player_id: ' + str(player_id))
 
 func _recv_set_creature_attitude(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
   var attitude := buf.get_u8()
   
-  Logger.debug_extreme('SET_CREATURE_ATTITUDE id: ' + str(id) + ', attitude: ' + str(attitude))
+  logger.debug_extreme('SET_CREATURE_ATTITUDE id: ' + str(id) + ', attitude: ' + str(attitude))
 
 func _recv_send_all_kingdoms(buf: ExtendedStreamPeerBuffer):
   var count := buf.get_32()
@@ -532,7 +532,7 @@ func _recv_send_all_kingdoms(buf: ExtendedStreamPeerBuffer):
     var name := buf.get_string_8()
     var suffix := buf.get_string_8()
     
-    Logger.debug_extreme('SEND_ALL_KINGDOMS id: ' + str(id) + ', name: ' + name + ', suffix: ' + suffix)
+    logger.debug_extreme('SEND_ALL_KINGDOMS id: ' + str(id) + ', name: ' + name + ', suffix: ' + suffix)
 
 func _recv_achievement_list(buf: ExtendedStreamPeerBuffer):
   var count := buf.get_32()
@@ -545,7 +545,7 @@ func _recv_achievement_list(buf: ExtendedStreamPeerBuffer):
     var time_achieved := buf.get_64()
     var counter := buf.get_32()
     
-    Logger.debug_extreme('ACHIEVEMENT_LIST id: ' + str(id) + ', name: ' + name + ', description: ' + description +
+    logger.debug_extreme('ACHIEVEMENT_LIST id: ' + str(id) + ', name: ' + name + ', description: ' + description +
       ', type: ' + str(type) + ', time_achieved: ' + str(time_achieved) + ', counter: ' + str(counter))
 
 func _recv_personal_goal_list(buf: ExtendedStreamPeerBuffer):
@@ -558,7 +558,7 @@ func _recv_personal_goal_list(buf: ExtendedStreamPeerBuffer):
       var name := buf.get_string_16()
       var hover_string := buf.get_string_16()
       
-      Logger.debug_extreme('PERSONAL_GOAL_LIST ADD_TIER parent_id: ' + str(parent_id) +
+      logger.debug_extreme('PERSONAL_GOAL_LIST ADD_TIER parent_id: ' + str(parent_id) +
         ', is_complete: ' + str(is_complete) + ', name: ' + name + ', hover_string: ' + hover_string)
       
       var count := buf.get_32()
@@ -569,7 +569,7 @@ func _recv_personal_goal_list(buf: ExtendedStreamPeerBuffer):
         var completion_percent := buf.get_8()
         var is_ach_complete := completion_percent == -1
         
-        Logger.debug_extreme('PERSONAL_GOAL_LIST ADD_ACH ach_id: ' + str(ach_id) + ', ach_name: ' + ach_name +
+        logger.debug_extreme('PERSONAL_GOAL_LIST ADD_ACH ach_id: ' + str(ach_id) + ', ach_name: ' + ach_name +
           ', ach_hover: ' + ach_hover + ', completion_percent: ' + str(completion_percent) +
           ', is_ach_complete: ' + str(is_ach_complete))
     2:
@@ -577,7 +577,7 @@ func _recv_personal_goal_list(buf: ExtendedStreamPeerBuffer):
       var is_complete := buf.get_8() == 1
       var name := buf.get_string_16()
       
-      Logger.debug_extreme('PERSONAL_GOAL_LIST UPDATE_TIER parent_id: ' + str(parent_id) +
+      logger.debug_extreme('PERSONAL_GOAL_LIST UPDATE_TIER parent_id: ' + str(parent_id) +
         ', is_complete: ' + str(is_complete) + ', name: ' + name)
     3:
       var ach_id := buf.get_32()
@@ -586,7 +586,7 @@ func _recv_personal_goal_list(buf: ExtendedStreamPeerBuffer):
       var completion_percent := buf.get_8()
       var is_ach_complete := completion_percent == -1
       
-      Logger.debug_extreme('PERSONAL_GOAL_LIST UPDATE_ACH ach_id: ' + str(ach_id) + ', ach_name: ' + ach_name +
+      logger.debug_extreme('PERSONAL_GOAL_LIST UPDATE_ACH ach_id: ' + str(ach_id) + ', ach_name: ' + ach_name +
         ', ach_hover: ' + ach_hover + ', completion_percent: ' + str(completion_percent) +
         ', is_ach_complete: ' + str(is_ach_complete))
     4:
@@ -594,7 +594,7 @@ func _recv_personal_goal_list(buf: ExtendedStreamPeerBuffer):
       var tutorial_id := buf.get_8()
       var name := buf.get_string_16()
       
-      Logger.debug_extreme('PERSONAL_GOAL_LIST ADD_TUT parent_id: ' + str(parent_id) +
+      logger.debug_extreme('PERSONAL_GOAL_LIST ADD_TUT parent_id: ' + str(parent_id) +
       ', tutorial_id: ' + str(tutorial_id) + ', name: ' + name)
 
 func _recv_status_stamina(buf: ExtendedStreamPeerBuffer):
@@ -604,7 +604,7 @@ func _recv_status_stamina(buf: ExtendedStreamPeerBuffer):
   _new_seed |= (stamina & 1) << _new_seed_pointer
   _new_seed_pointer += 1
   
-  Logger.debug_extreme('STATUS_STAMINA stamina: ' + str(stamina / 65535.0) + ', damage: ' + str(damage / 65535.0))
+  logger.debug_extreme('STATUS_STAMINA stamina: ' + str(stamina / 65535.0) + ', damage: ' + str(damage / 65535.0))
 
 func _recv_status_effect_bar(buf: ExtendedStreamPeerBuffer):
   var type := buf.get_8()
@@ -618,15 +618,15 @@ func _recv_status_effect_bar(buf: ExtendedStreamPeerBuffer):
       if buf.get_available_bytes() > 0:
         name = buf.get_string_8()
       
-      Logger.debug_extreme('STATUS_EFFECT_BAR add id: ' + str(id) + ', type_id: ' + str(type_id) +
+      logger.debug_extreme('STATUS_EFFECT_BAR add id: ' + str(id) + ', type_id: ' + str(type_id) +
         ', duration: ' + str(duration) + ', name: ' + name)
     1:
-      Logger.debug_extreme('STATUS_EFFECT_BAR remove id: ' + str(id))
+      logger.debug_extreme('STATUS_EFFECT_BAR remove id: ' + str(id))
 
 func _recv_remove_spell_effect(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
   
-  Logger.debug_extreme('REMOVE_SPELL_EFFECT id: ' + str(id))
+  logger.debug_extreme('REMOVE_SPELL_EFFECT id: ' + str(id))
 
 func _recv_add_spell_effect(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
@@ -637,7 +637,7 @@ func _recv_add_spell_effect(buf: ExtendedStreamPeerBuffer):
   var duration := buf.get_32()
   var power := buf.get_float()
   
-  Logger.debug_extreme('ADD_SPELL_EFFECT id: ' + str(id) + ', name: ' + name + ', type: ' + str(type) +
+  logger.debug_extreme('ADD_SPELL_EFFECT id: ' + str(id) + ', name: ' + name + ', type: ' + str(type) +
     ', effect_type: ' + str(effect_type) + ', influence: ' + str(influence) + ', duration: ' + str(duration) +
     ', power: ' + str(power))
 
@@ -651,27 +651,27 @@ func _recv_status_hunger(buf: ExtendedStreamPeerBuffer):
     var fats := buf.get_8()
     var protein := buf.get_8()
     
-    Logger.debug_extreme('STATUS_HUNGER with_sub hunger: ' + str(hunger) + ', nutrition: ' + str(nutrition) +
+    logger.debug_extreme('STATUS_HUNGER with_sub hunger: ' + str(hunger) + ', nutrition: ' + str(nutrition) +
       ', calories: ' + str(calories) + ', carbs: ' + str(carbs) + ', fats: ' + str(fats) + ', protein: ' + str(protein))
   else:
-    Logger.debug_extreme('STATUS_HUNGER no_sub hunger: ' + str(hunger) + ', nutrition: ' + str(nutrition))
+    logger.debug_extreme('STATUS_HUNGER no_sub hunger: ' + str(hunger) + ', nutrition: ' + str(nutrition))
 
 func _recv_status_thirst(buf: ExtendedStreamPeerBuffer):
   var thirst := buf.get_u16() / 65535.0
   
-  Logger.debug_extreme('STATUS_THIRST thirst: ' + str(thirst))
+  logger.debug_extreme('STATUS_THIRST thirst: ' + str(thirst))
 
 func _recv_update_player_titles(buf: ExtendedStreamPeerBuffer):
   var title := buf.get_string_16()
   var meditation_title := buf.get_string_16()
   
-  Logger.debug_extreme('UPDATE_PLAYER_TITLES title: ' + title + ', meditation_title: ' + meditation_title)
+  logger.debug_extreme('UPDATE_PLAYER_TITLES title: ' + title + ', meditation_title: ' + meditation_title)
 
 func _recv_sleep_bonus_info(buf: ExtendedStreamPeerBuffer):
   var status := buf.get_8()
   var seconds_left := buf.get_32()
   
-  Logger.debug_extreme('SLEEP_BONUS_INFO status: ' + str(status) + ', seconds_left: ' + str(seconds_left))
+  logger.debug_extreme('SLEEP_BONUS_INFO status: ' + str(status) + ', seconds_left: ' + str(seconds_left))
 
 func _recv_add_effect(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
@@ -689,7 +689,7 @@ func _recv_add_effect(buf: ExtendedStreamPeerBuffer):
     timeout = buf.get_float()
     rotation_offset = buf.get_float()
   
-  Logger.debug_extreme('ADD_EFFECT id: ' + str(id) + ', type: ' + str(type) + ', x: ' + str(x) + ', y: ' + str(y) +
+  logger.debug_extreme('ADD_EFFECT id: ' + str(id) + ', type: ' + str(type) + ', x: ' + str(x) + ', y: ' + str(y) +
     ', h: ' + str(h) + ', layer: ' + str(layer) + ', effect_name: ' + effect_name + ', timeout: ' + str(timeout) +
     ', rotation_offset: ' + str(rotation_offset))
 
@@ -705,7 +705,7 @@ func _recv_set_equipment(buf: ExtendedStreamPeerBuffer):
   var g1 := buf.get_float()
   var b1 := buf.get_float()
   
-  Logger.debug_extreme('SET_EQUIPMENT wurm_id: ' + str(wurm_id) + ', slot: ' + str(slot) + ', model: ' + model +
+  logger.debug_extreme('SET_EQUIPMENT wurm_id: ' + str(wurm_id) + ', slot: ' + str(slot) + ', model: ' + model +
     ', rarity: ' + str(rarity) + ', r: ' + str(r) + ', g: ' + str(g) + ', b: ' + str(b) + ', r1: ' + str(r1) +
     ', g1: ' + str(g1) + ', b1: ' + str(b1))
 
@@ -739,13 +739,13 @@ func _recv_creature_layer(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
   var layer := buf.get_8()
   
-  Logger.debug_extreme('CREATURE_LAYER id: ' + str(id) + ', layer: ' + str(layer))
+  logger.debug_extreme('CREATURE_LAYER id: ' + str(id) + ', layer: ' + str(layer))
 
 func _recv_toggle_client_feature(buf: ExtendedStreamPeerBuffer):
   var type := buf.get_u8()
   var value := buf.get_u8()
   
-  Logger.debug_extreme('TOGGLE_CLIENT_FEATURE type: ' + str(type) + ', value: ' + str(value))
+  logger.debug_extreme('TOGGLE_CLIENT_FEATURE type: ' + str(type) + ', value: ' + str(value))
 
 func _recv_add_creature(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
@@ -774,7 +774,7 @@ func _recv_add_creature(buf: ExtendedStreamPeerBuffer):
   if buf.get_available_bytes() > 0:
     rarity = buf.get_8()
   
-  Logger.debug_extreme('ADD_CREATURE id: ' + str(id) + ', model: ' + model + ', solid: ' + str(solid) +
+  logger.debug_extreme('ADD_CREATURE id: ' + str(id) + ', model: ' + model + ', solid: ' + str(solid) +
     ', x: ' + str(x) + ', y: ' + str(y) + ', bridge_id: ' + str(bridge_id) + ', rot: ' + str(rot) + ', h: ' + str(h) +
     ', name: ' + name + ', hover_text: ' + hover_text + ', floating: ' + str(floating) + ', layer: ' + str(layer) +
     ', type: ' + str(type) + ', material_id: ' + str(material_id) + ', sound_source_id: ' + str(sound_source_id) +
@@ -791,13 +791,13 @@ func _recv_resize(buf: ExtendedStreamPeerBuffer):
   var y := buf.get_u8() / 64.0
   var z := buf.get_u8() / 64.0
   
-  Logger.debug_extreme('RESIZE id: ' + str(id) + ', x: ' + str(x) + ', y: ' + str(y) + ', z: ' + str(z))
+  logger.debug_extreme('RESIZE id: ' + str(id) + ', x: ' + str(x) + ', y: ' + str(y) + ', z: ' + str(z))
 
 func _recv_set_creature_damage(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
   var dmg := buf.get_float()
   
-  Logger.debug_extreme('SET_CREATURE_DAMAGE id: ' + str(id) + ', dmg: ' + str(dmg))
+  logger.debug_extreme('SET_CREATURE_DAMAGE id: ' + str(id) + ', dmg: ' + str(dmg))
 
 func _recv_attach_effect(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
@@ -807,7 +807,7 @@ func _recv_attach_effect(buf: ExtendedStreamPeerBuffer):
   var data2 := buf.get_8()
   var data3 := buf.get_8()
   
-  Logger.debug_extreme('ATTACH_EFFECT id: ' + str(id) + ', type: ' + str(type) + ', data0: ' + str(data0) +
+  logger.debug_extreme('ATTACH_EFFECT id: ' + str(id) + ', type: ' + str(type) + ', data0: ' + str(data0) +
     ', data1: ' + str(data1) + ', data2: ' + str(data2) + ', data3: ' + str(data3))
 
 func _receive_item_or_corpse(creature_dead_id: int, buf: ExtendedStreamPeerBuffer):
@@ -839,14 +839,14 @@ func _receive_item_or_corpse(creature_dead_id: int, buf: ExtendedStreamPeerBuffe
     extra2 = buf.get_32()
     
   if creature_dead_id < 0:
-    Logger.debug_extreme('ITEM_OR_CORPSE item item_id: ' + str(item_id) + ', model: ' + model + ', name: ' + name +
+    logger.debug_extreme('ITEM_OR_CORPSE item item_id: ' + str(item_id) + ', model: ' + model + ', name: ' + name +
       ', hover_text: ' + hover_text + ', material_id: ' + str(material_id) + ', x: ' + str(x) + ', y: ' + str(y) +
       ', h: ' + str(h) + ', rot: ' + str(rot) + ', layer: ' + str(layer) + ', description: ' + description +
       ', icon_id: ' + str(icon_id) + ', scale: ' + str(scale) + ', bridge_id: ' + str(bridge_id) +
       ', rarity: ' + str(rarity) + ', placeable: ' + str(placeable) + ', parent: ' + str(parent) +
       ', extra2: ' + str(extra2))
   else:
-    Logger.debug_extreme('ITEM_OR_CORPSE corpse creature_id: ' + str(creature_dead_id) + 'item_id: ' + str(item_id) +
+    logger.debug_extreme('ITEM_OR_CORPSE corpse creature_id: ' + str(creature_dead_id) + 'item_id: ' + str(item_id) +
       ', model: ' + model + ', name: ' + name + ', hover_text: ' + hover_text + ', material_id: ' + str(material_id) +
       ', x: ' + str(x) + ', y: ' + str(y) + ', h: ' + str(h) + ', rot: ' + str(rot) + ', layer: ' + str(layer) +
       ', description: ' + description + ', icon_id: ' + str(icon_id) + ', scale: ' + str(scale) +
@@ -879,7 +879,7 @@ func _recv_add_fence(buf: ExtendedStreamPeerBuffer):
   if buf.get_available_bytes() > 0:
     name = buf.get_string_8()
   
-  Logger.debug_extreme('ADD_FENCE x: ' + str(x) + ', y: ' + str(y) + ', dir: ' + str(dir) + ', type: ' + str(type) +
+  logger.debug_extreme('ADD_FENCE x: ' + str(x) + ', y: ' + str(y) + ', dir: ' + str(dir) + ', type: ' + str(type) +
     ', is_complete: ' + str(is_complete) + ', r: ' + str(r) + ', g: ' + str(g) + ', b: ' + str(b) + ', a: ' + str(a) +
     ', height_offset: ' + str(height_offset) + ', layer: ' + str(layer) + ', name: ' + name)
 
@@ -891,10 +891,10 @@ func _recv_add_structure(buf: ExtendedStreamPeerBuffer):
   var y_center := buf.get_16()
   var layer := buf.get_8()
   if type == 0:
-    Logger.debug_extreme('ADD_STRUCTURE house id: ' + str(id) + ', name: ' + name + ', x_center: ' + str(x_center) +
+    logger.debug_extreme('ADD_STRUCTURE house id: ' + str(id) + ', name: ' + name + ', x_center: ' + str(x_center) +
       ', y_center: ' + str(y_center) + ', layer: ' + str(layer))
   else:
-    Logger.debug_extreme('ADD_STRUCTURE bridge id: ' + str(id) + ', name: ' + name + ', x_center: ' + str(x_center) +
+    logger.debug_extreme('ADD_STRUCTURE bridge id: ' + str(id) + ', name: ' + name + ', x_center: ' + str(x_center) +
       ', y_center: ' + str(y_center) + ', layer: ' + str(layer))
 
 func _recv_build_mark(buf: ExtendedStreamPeerBuffer):
@@ -906,7 +906,7 @@ func _recv_build_mark(buf: ExtendedStreamPeerBuffer):
     var x := buf.get_16()
     var y := buf.get_16()
     
-    Logger.debug_extreme('BUILD_MARK id: ' + str(id) + ', layer: ' + str(layer) + ', x: ' + str(x) + ', y: ' + str(y))
+    logger.debug_extreme('BUILD_MARK id: ' + str(id) + ', layer: ' + str(layer) + ', x: ' + str(x) + ', y: ' + str(y))
 
 func _recv_add_wall(buf: ExtendedStreamPeerBuffer):
   var house_id := buf.get_64()
@@ -933,7 +933,7 @@ func _recv_add_wall(buf: ExtendedStreamPeerBuffer):
   if buf.get_available_bytes() > 0:
     name = buf.get_string_8()
   
-  Logger.debug_extreme('ADD_WALL house_id: ' + str(house_id) + ' x: ' + str(x) + ', y: ' + str(y) +
+  logger.debug_extreme('ADD_WALL house_id: ' + str(house_id) + ' x: ' + str(x) + ', y: ' + str(y) +
     ', dir: ' + str(dir) + ', type: ' + str(type) + ', material: ' + str(material) + ', r: ' + str(r) +
     ', g: ' + str(g) + ', b: ' + str(b) + ', a: ' + str(a) + ', height_offset: ' + str(height_offset) +
     ', layer: ' + str(layer) + ', override_reverse: ' + str(override_reverse) + ', name: ' + name)
@@ -950,11 +950,11 @@ func _recv_add_floor(buf: ExtendedStreamPeerBuffer):
   var dir := buf.get_8()
   
   if type == 4:
-    Logger.debug_extreme('ADD_FLOOR roof house_id: ' + str(house_id) + ', x: ' + str(x) + ', y: ' + str(y) +
+    logger.debug_extreme('ADD_FLOOR roof house_id: ' + str(house_id) + ', x: ' + str(x) + ', y: ' + str(y) +
       ', height_offset: ' + str(height_offset) + ', type: ' + str(type) + ', material: ' + str(material) +
       ', state: ' + str(state) + ', layer: ' + str(layer))
   else:
-    Logger.debug_extreme('ADD_FLOOR floor house_id: ' + str(house_id) + ', x: ' + str(x) + ', y: ' + str(y) +
+    logger.debug_extreme('ADD_FLOOR floor house_id: ' + str(house_id) + ', x: ' + str(x) + ', y: ' + str(y) +
       ', height_offset: ' + str(height_offset) + ', type: ' + str(type) + ', material: ' + str(material) +
       ', state: ' + str(state) + ', layer: ' + str(layer) + ', dir: ' + str(dir))
 
@@ -966,11 +966,11 @@ func _recv_repaint(buf: ExtendedStreamPeerBuffer):
   var a := buf.get_u8() / 255.0
   var paint_type := buf.get_u8()
   
-  Logger.debug_extreme('REPAINT id: ' + str(id) + ', r: ' + str(r) + ', g: ' + str(g) + ', b: ' + str(b) +
+  logger.debug_extreme('REPAINT id: ' + str(id) + ', r: ' + str(r) + ', g: ' + str(g) + ', b: ' + str(b) +
     ', a: ' + str(a) + ', paint_type: ' + str(paint_type))
 
 func _recv_start_moving():
-  Logger.debug_extreme('START_MOVING')
+  logger.debug_extreme('START_MOVING')
 
 func _recv_move_creature(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
@@ -978,7 +978,7 @@ func _recv_move_creature(buf: ExtendedStreamPeerBuffer):
   var x := buf.get_float()
   var rot_diff := buf.get_8()
   
-  Logger.debug_extreme('MOVE_CREATURE id: ' + str(id) + ', x: ' + str(x) + ', y: ' + str(y) +
+  logger.debug_extreme('MOVE_CREATURE id: ' + str(id) + ', x: ' + str(x) + ', y: ' + str(y) +
     ', rot_diff: ' + str(rot_diff))
 
 func _recv_move_creature_and_set_z(buf: ExtendedStreamPeerBuffer):
@@ -988,7 +988,7 @@ func _recv_move_creature_and_set_z(buf: ExtendedStreamPeerBuffer):
   var rot_diff := buf.get_8()
   var y := buf.get_float()
   
-  Logger.debug_extreme('MOVE_CREATURE_AND_SET_Z id: ' + str(id) + ', x: ' + str(x) + ', y: ' + str(y) +
+  logger.debug_extreme('MOVE_CREATURE_AND_SET_Z id: ' + str(id) + ', x: ' + str(x) + ', y: ' + str(y) +
     ', h: ' + str(h) + ', rot_diff: ' + str(rot_diff))
 
 func _recv_tilestrip_far(buf: ExtendedStreamPeerBuffer):
@@ -1020,7 +1020,7 @@ func _recv_server_time(buf: ExtendedStreamPeerBuffer):
   var server_time_ms := buf.get_64()
   var wurm_time_s := buf.get_64()
   
-  Logger.debug_extreme('SERVER_TIME server_time_ms: ' + str(server_time_ms) + ', wurm_time_s: ' + str(wurm_time_s))
+  logger.debug_extreme('SERVER_TIME server_time_ms: ' + str(server_time_ms) + ', wurm_time_s: ' + str(wurm_time_s))
 
 func _handle_recv(bytes: PoolByteArray):
   var buf := ExtendedStreamPeerBuffer.new()
@@ -1086,7 +1086,7 @@ func _handle_recv(bytes: PoolByteArray):
     112: _recv_add_structure(buf)
     124: _recv_set_skill(buf)
     var code:
-      Logger.warn('UNHANDLED RECV CODE: ' + str(code))
+      logger.warn('UNHANDLED RECV CODE: ' + str(code))
   
   if _new_seed_pointer == 32:
     encryption_service.decrypt_random = Random.new(_new_seed)

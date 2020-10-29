@@ -1,5 +1,32 @@
 class_name WOMLoader
 
+#broken anims:
+#  aggro/DrakeSpirit/drakeS_Main - completely broken
+#  blackbear/blackbearMain - lil stretched
+#  bunny/easterBunny_main - left limbs are pointing the wrong way
+#  calf/Calf_main - back legs don't work in walk anim
+#  deathcrawler/deathCrawler_Main - shrinks slightly
+#  dog/Dog_main - walk anim broken
+#  dragons/ - all walk anim back legs don't work, hatchlings are stretched
+#  forestgiant/Forest_giant_main - shrinks slightly
+#  goblins/goblinLeader_main - squished
+#  hen/chicken_main - floats, walk anim broken
+#  hen/Rooster_main - idle anim broken
+#  horse/Foal_main - missing animations
+#  horse/HellHorseFoal_Main - big stretch
+#  huge_spider/ - all spiders are big large
+#  humanFallback/maleFallback - legs don't work
+#  lavaspider/Lavaspider_main - not big large, but floating and animations are broken
+#  pumpkincreature/main - broken
+#  seal/SealCub_main - stretched
+#  sheep/Lamb_main - slightly stretched
+#  sheep/Ram_main - very squished
+#  sheep/Sheep_main - very squished
+#  sonofnogump/nogump_Main - anims broken
+#  trolls/trollKing_main - very squished
+#  wild_boar/Boar_main - slightly shrunk
+#  wolf/Wolf_main_bp - very squished
+
 static func _search_recursively(path: String, file_name: String):
   var dir := Directory.new()
   dir.open(path)
@@ -187,7 +214,7 @@ static func _load_model(gd_unzip, model_path: String) -> WOMModel:
       if joint_data.parent_ind != -1:
         skeleton.set_bone_parent(bone_ind, joint_data.parent_ind)
       skeleton.set_bone_rest(bone_ind, joint_data.bind_offset.get_transform())
-    print(model_path, any_is_child_of_blend)
+    # print(model_path, any_is_child_of_blend)
   
   for mesh_data in wom_model_data.mesh_datas:
 #    print('mesh: ', mesh_data.name)
@@ -275,11 +302,11 @@ static func _load_model(gd_unzip, model_path: String) -> WOMModel:
       if texture_name != '':
         var texture_path := 'user://content/textures/' + dir_path + '/' + texture_name
         if !dir.file_exists(texture_path):
-          print(texture_path + ' does not exist, searching recursively')
+          # print(texture_path + ' does not exist, searching recursively')
           texture_path = _search_recursively('user://content/textures', texture_name)
         
         if !dir.file_exists(texture_path):
-          print(texture_path + ' does not exist, after searching recursively')
+          # print(texture_path + ' does not exist, after searching recursively')
           continue
         
         material.set_texture(SpatialMaterial.TEXTURE_ALBEDO, load(texture_path))
@@ -345,17 +372,17 @@ static func _load_model(gd_unzip, model_path: String) -> WOMModel:
       var model_anims: Dictionary = properties['anim']
       for anim_key in model_anims.keys():
         
-        var anim := _load_anim(gd_unzip, dir_path + '/' + model_anims[anim_key]['file'], anim_key, wom_model_data)
+        var anim := _load_anim(gd_unzip, dir_path + '/' + model_anims[anim_key]['file'], wom_model_data)
         animation_player.add_animation(anim_key, anim)
   
   return wom_model
 
-static func _load_anim(gd_unzip, anim_path: String, anim_name: String, wom_model_data: WOMModelData) -> Animation:
+static func _load_anim(gd_unzip, anim_path: String, wom_model_data: WOMModelData) -> Animation:
   var dir_path := anim_path.substr(0, anim_path.find_last('/'))
   var anim_file_name := anim_path.substr(anim_path.find_last('/') + 1, anim_path.length())
   var animation := Animation.new()
   
-  print('anim ', anim_name, anim_path)
+  # print('anim ', anim_name, anim_path)
   
   var buf := ExtendedStreamPeerBuffer.new()
   buf.data_array = gd_unzip.uncompress(anim_path)
@@ -369,7 +396,7 @@ static func _load_anim(gd_unzip, anim_path: String, anim_name: String, wom_model
     var keyframe_count := buf.get_32()
     
 #    print(anim_name)
-    print(joint_name)
+    # print(joint_name)
     var joint_data: WOMJointData
     for jd in wom_model_data.joint_datas:
       if jd.name == joint_name:

@@ -39,7 +39,7 @@ func _ready():
   picking_box_mi = get_node_or_null(picking_box_model_name)
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta):
+func _process(_delta):
   if lod1_mis.size() == 0 && lod2_mis.size() == 0 && lod3_mis.size() == 0: return
   
   var camera := get_viewport().get_camera()

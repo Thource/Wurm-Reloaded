@@ -59,7 +59,7 @@ _global_script_classes=[ {
 "language": "GDScript",
 "path": "res://scripts/GDUnzip.gd"
 }, {
-"base": "Reference",
+"base": "Node",
 "class": "Logger",
 "language": "GDScript",
 "path": "res://scripts/Logger.gd"
@@ -74,7 +74,7 @@ _global_script_classes=[ {
 "language": "GDScript",
 "path": "res://scripts/OverflowService.gd"
 }, {
-"base": "Reference",
+"base": "Spatial",
 "class": "Player",
 "language": "GDScript",
 "path": "res://scripts/Player.gd"
@@ -84,7 +84,7 @@ _global_script_classes=[ {
 "language": "GDScript",
 "path": "res://scripts/Random.gd"
 }, {
-"base": "Reference",
+"base": "Node",
 "class": "ResourceResolver",
 "language": "GDScript",
 "path": "res://scripts/ResourceResolver.gd"
@@ -104,7 +104,7 @@ _global_script_classes=[ {
 "language": "GDScript",
 "path": "res://scripts/WOMModel.gd"
 }, {
-"base": "Reference",
+"base": "Node",
 "class": "WurmWorld",
 "language": "GDScript",
 "path": "res://scripts/WurmWorld.gd"
@@ -137,6 +137,11 @@ _global_script_class_icons={
 config/name="WurmReloaded"
 run/main_scene="res://scenes/DataImport.tscn"
 config/icon="res://icon.png"
+
+[autoload]
+
+resource_resolver="*res://scripts/ResourceResolver.gd"
+logger="*res://scripts/Logger.gd"
 
 [rendering]
 

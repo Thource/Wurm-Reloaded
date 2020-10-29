@@ -8,8 +8,8 @@ var _multiplier := 0x5DEECE66D
 var _addend := 0xB
 var _mask := 281474976710655                                                                                                                                                           
 
-func _init(_seed: int):
-  self._seed = (_seed ^ _multiplier) & _mask
+func _init(__seed: int):
+  self._seed = (__seed ^ _multiplier) & _mask
 
 # Takes in a decimal value (int) and returns the binary value (int)
 func _dec2bin(decimal_value: int) -> String:
@@ -29,7 +29,7 @@ func _bin2dec(binary_value: String):
   for i in range(binary_value.length()):
     if binary_value[i] == '0': continue
     
-    var bit_dec_value := pow(2, binary_value.length() - 1 - i)
+    var bit_dec_value := pow(2, binary_value.length() - 1 - i) as int
 #    print(i, ' ', bit_dec_value)
     if i == 0:
       decimal_value -= bit_dec_value
@@ -43,7 +43,7 @@ func _bin2dec(binary_value: String):
 func _unsigned_bit_shift(num: int, times: int):
   var binary := _dec2bin(num)
 
-  for i in range(times):
+  for _i in range(times):
     binary = '0' + binary.substr(0, binary.length() - 1)
 
   return _bin2dec(binary)

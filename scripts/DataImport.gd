@@ -5,9 +5,9 @@ class ImportStatus:
   var progress := 0
   var max_progress := 0
   
-  func set_stage(stage: String, max_progress: int):
-    self.stage = stage
-    self.max_progress = max_progress
+  func set_stage(_stage: String, _max_progress: int):
+    self.stage = _stage
+    self.max_progress = _max_progress
     self.progress = 1
 
 export var import_stage_label_path: NodePath
@@ -23,7 +23,29 @@ var _import_status := ImportStatus.new()
 func _ready():
   pass
 
+class LoadedResource:
+  var spatial: Spatial
+  var direction: Vector3
+var _loaded_resources := []
+
+func _fling_texture(image_texture: ImageTexture):
+  var loaded_resource := LoadedResource.new()
+  var spatial := Spatial.new()
+  var mi := MeshInstance.new()
+  mi.mesh = QuadMesh.new()
+  var mat := SpatialMaterial.new()
+  mat.albedo_texture = image_texture
+  mi.mesh.surface_set_material(0, mat)
+  spatial.add_child(mi)
+  add_child(spatial)
+  loaded_resource.spatial = spatial
+  loaded_resource.direction = Vector3(rand_range(-4.0, 4.0), rand_range(-4.0, 4.0), 0).normalized()
+  _loaded_resources.push_back(loaded_resource)
+
 func _process(delta: float):
+  for lr in _loaded_resources:
+    lr.spatial.translation += lr.direction * delta * 4.0
+
   if _import_status.stage == '': return
   if _import_status.stage == 'Done':
     _import_status.stage = ''
@@ -112,24 +134,26 @@ func _import(path: String):
 #
 #      _import_status.progress += 1
 
-#  _import_status.set_stage('Importing textures', 0)
-#  for jar_ind in range(jars.size()):
-#    _import_status.max_progress += jar_files_by_extensions[jar_ind].get('dds', []).size()
-#
-#  for jar_ind in range(jars.size()):
-#    var gd_unzip = gd_unzips[jar_ind]
-#
-#    for file_path in jar_files_by_extensions[jar_ind].get('dds', []):
-#      var split_path: PoolStringArray = file_path.split('/')
-#      split_path.remove(split_path.size() - 1)
-#      Directory.new().make_dir_recursive('user://content/textures/' + split_path.join('/'))
-#
-#      var image := _convert_dds_to_image(gd_unzip.uncompress(file_path))
-#      var image_texture := ImageTexture.new()
-#      image_texture.create_from_image(image)
-#      ResourceSaver.save('user://content/textures/' + file_path.replace('.dds', '.tres'), image_texture)
-#
-#      _import_status.progress += 1
+  _import_status.set_stage('Importing textures', 0)
+  for jar_ind in range(jars.size()):
+    _import_status.max_progress += jar_files_by_extensions[jar_ind].get('dds', []).size()
+
+  for jar_ind in range(jars.size()):
+    var gd_unzip = gd_unzips[jar_ind]
+
+    for file_path in jar_files_by_extensions[jar_ind].get('dds', []):
+      var split_path: PoolStringArray = file_path.split('/')
+      split_path.remove(split_path.size() - 1)
+      Directory.new().make_dir_recursive('user://content/textures/' + split_path.join('/'))
+
+      var image := _convert_dds_to_image(gd_unzip.uncompress(file_path))
+      var image_texture := ImageTexture.new()
+      image_texture.create_from_image(image)
+      ResourceSaver.save('user://content/textures/' + file_path.replace('.dds', '.tres'), image_texture)
+      
+      call_deferred('_fling_texture', image_texture)
+
+      _import_status.progress += 1
 
   _import_status.set_stage('Importing models', 0)
   for jar_ind in range(jars.size()):
@@ -178,8 +202,8 @@ func _import(path: String):
   
   # empty the mapping file
   var mapping_file := File.new()
-  mapping_file.open('user://content/resource_map.txt', File.WRITE)
-  mapping_file.close()
+  if mapping_file.open('user://content/resource_map.txt', File.WRITE) != 0:
+    mapping_file.close()
 
   for jar_ind in range(jars.size()):
     var gd_unzip = gd_unzips[jar_ind]
@@ -216,13 +240,7 @@ func _import(path: String):
         Directory.new().remove('user://mappings_tmp.txt')
 
       _import_status.progress += 1
-#
-#  var wom_mesh_datas := WOMLoader.load_wom(gd_unzips[0].uncompress('trees/mapleTree.wom'), 'trees')
-#  for wom_mesh_data in wom_mesh_datas:
-#    print('save ' + wom_mesh_data.name)
-#    ResourceSaver.save('res://test-mapleTree-' + wom_mesh_data.name + '.tres', wom_mesh_data.mesh)
-#
-  
+
 #  for jar_ind in range(jars.size()):
 #    for extension in jar_files_by_extensions[jar_ind].keys():
 #      print(extension, jar_files_by_extensions[jar_ind][extension].size())
@@ -246,49 +264,49 @@ func _convert_dds_to_image(bytes: PoolByteArray) -> Image:
   var buffer := StreamPeerBuffer.new()
   buffer.data_array = bytes
   
-  Logger.debug('bytes ' + str(buffer.get_available_bytes()), Logger.DebugLevel.EXTREME)
+  logger.debug('bytes ' + str(buffer.get_available_bytes()), logger.DebugLevel.EXTREME)
   
   var magic_value := buffer.get_u32()
-  Logger.debug('magic_value ' + str(magic_value), Logger.DebugLevel.EXTREME)
+  logger.debug('magic_value ' + str(magic_value), logger.DebugLevel.EXTREME)
   
   # Surface format header
   buffer.get_u32() # SFH size, always 124
   var flags := buffer.get_u32()
-  Logger.debug('flags ' + str(flags), Logger.DebugLevel.EXTREME)
+  logger.debug('flags ' + str(flags), logger.DebugLevel.EXTREME)
   var height := buffer.get_u32()
-  Logger.debug('height ' + str(height), Logger.DebugLevel.EXTREME)
+  logger.debug('height ' + str(height), logger.DebugLevel.EXTREME)
   var width := buffer.get_u32()
-  Logger.debug('width ' + str(width), Logger.DebugLevel.EXTREME)
+  logger.debug('width ' + str(width), logger.DebugLevel.EXTREME)
   var pitch_or_linear_size := buffer.get_u32()
-  Logger.debug('pitch_or_linear_size ' + str(pitch_or_linear_size), Logger.DebugLevel.EXTREME)
+  logger.debug('pitch_or_linear_size ' + str(pitch_or_linear_size), logger.DebugLevel.EXTREME)
   var depth := buffer.get_u32()
-  Logger.debug('depth ' + str(depth), Logger.DebugLevel.EXTREME)
+  logger.debug('depth ' + str(depth), logger.DebugLevel.EXTREME)
   var mip_map_count := buffer.get_u32()
-  Logger.debug('mip_map_count ' + str(mip_map_count), Logger.DebugLevel.EXTREME)
+  logger.debug('mip_map_count ' + str(mip_map_count), logger.DebugLevel.EXTREME)
   for i in range(11): buffer.get_u32() # reserved
   
   # Pixel format
   buffer.get_u32() # PF size, always 32
   var pf_flags := buffer.get_u32()
-  Logger.debug('pf_flags ' + str(pf_flags), Logger.DebugLevel.EXTREME)
+  logger.debug('pf_flags ' + str(pf_flags), logger.DebugLevel.EXTREME)
   var four_cc := buffer.get_string(4)
-  Logger.debug('four_cc ' + str(four_cc), Logger.DebugLevel.EXTREME)
+  logger.debug('four_cc ' + str(four_cc), logger.DebugLevel.EXTREME)
   var rgb_bit_count := buffer.get_u32()
-  Logger.debug('rgb_bit_count ' + str(rgb_bit_count), Logger.DebugLevel.EXTREME)
+  logger.debug('rgb_bit_count ' + str(rgb_bit_count), logger.DebugLevel.EXTREME)
   var r_bit_mask := buffer.get_u32()
-  Logger.debug('r_bit_mask ' + str(r_bit_mask), Logger.DebugLevel.EXTREME)
+  logger.debug('r_bit_mask ' + str(r_bit_mask), logger.DebugLevel.EXTREME)
   var g_bit_mask := buffer.get_u32()
-  Logger.debug('g_bit_mask ' + str(g_bit_mask), Logger.DebugLevel.EXTREME)
+  logger.debug('g_bit_mask ' + str(g_bit_mask), logger.DebugLevel.EXTREME)
   var b_bit_mask := buffer.get_u32()
-  Logger.debug('b_bit_mask ' + str(b_bit_mask), Logger.DebugLevel.EXTREME)
+  logger.debug('b_bit_mask ' + str(b_bit_mask), logger.DebugLevel.EXTREME)
   var a_bit_mask := buffer.get_u32()
-  Logger.debug('a_bit_mask ' + str(a_bit_mask), Logger.DebugLevel.EXTREME)
+  logger.debug('a_bit_mask ' + str(a_bit_mask), logger.DebugLevel.EXTREME)
   
   # Caps
   var caps1 := buffer.get_u32()
-  Logger.debug('caps1 ' + str(caps1), Logger.DebugLevel.EXTREME)
+  logger.debug('caps1 ' + str(caps1), logger.DebugLevel.EXTREME)
   var caps2 := buffer.get_u32()
-  Logger.debug('caps2 ' + str(caps2), Logger.DebugLevel.EXTREME)
+  logger.debug('caps2 ' + str(caps2), logger.DebugLevel.EXTREME)
   for i in range(2): buffer.get_u32() # reserved
   
   buffer.get_u32() # reserved
@@ -302,7 +320,7 @@ func _convert_dds_to_image(bytes: PoolByteArray) -> Image:
   var image := Image.new()
   image.create_from_data(width, height, false, format, buffer.get_data(pitch_or_linear_size)[1])
   
-  Logger.debug('bytes left ' + str(buffer.get_available_bytes()), Logger.DebugLevel.EXTREME)
+  logger.debug('bytes left ' + str(buffer.get_available_bytes()), logger.DebugLevel.EXTREME)
   
   return image
 
