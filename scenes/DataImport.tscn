@@ -5,7 +5,6 @@
 [ext_resource path="res://scripts/FileDialog.gd" type="Script" id=3]
 [ext_resource path="res://scripts/Continue.gd" type="Script" id=4]
 
-
 [node name="DataImport" type="Control"]
 anchor_right = 1.0
 anchor_bottom = 1.0

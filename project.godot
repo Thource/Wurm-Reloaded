@@ -39,7 +39,7 @@ _global_script_classes=[ {
 "language": "GDScript",
 "path": "res://scripts/BMLRadio.gd"
 }, {
-"base": "Reference",
+"base": "Node",
 "class": "ConnectionHandler",
 "language": "GDScript",
 "path": "res://scripts/ConnectionHandler.gd"
@@ -49,10 +49,10 @@ _global_script_classes=[ {
 "language": "GDScript",
 "path": "res://scripts/EncryptionService.gd"
 }, {
-"base": "Reference",
-"class": "ExtendedPoolByteArray",
+"base": "StreamPeerBuffer",
+"class": "ExtendedStreamPeerBuffer",
 "language": "GDScript",
-"path": "res://scripts/ExtendedPoolByteArray.gd"
+"path": "res://scripts/ExtendedStreamPeerBuffer.gd"
 }, {
 "base": "Reference",
 "class": "GDUnzip",
@@ -63,6 +63,11 @@ _global_script_classes=[ {
 "class": "Logger",
 "language": "GDScript",
 "path": "res://scripts/Logger.gd"
+}, {
+"base": "Reference",
+"class": "Matrix4x4",
+"language": "GDScript",
+"path": "res://scripts/Matrix4x4.gd"
 }, {
 "base": "Reference",
 "class": "OverflowService",
@@ -94,7 +99,7 @@ _global_script_classes=[ {
 "language": "GDScript",
 "path": "res://scripts/WOMLoader.gd"
 }, {
-"base": "Reference",
+"base": "Spatial",
 "class": "WOMModel",
 "language": "GDScript",
 "path": "res://scripts/WOMModel.gd"
@@ -113,9 +118,10 @@ _global_script_class_icons={
 "BMLRadio": "",
 "ConnectionHandler": "",
 "EncryptionService": "",
-"ExtendedPoolByteArray": "",
+"ExtendedStreamPeerBuffer": "",
 "GDUnzip": "",
 "Logger": "",
+"Matrix4x4": "",
 "OverflowService": "",
 "Player": "",
 "Random": "",
@@ -129,7 +135,7 @@ _global_script_class_icons={
 [application]
 
 config/name="WurmReloaded"
-run/main_scene="res://DataImport.tscn"
+run/main_scene="res://scenes/DataImport.tscn"
 config/icon="res://icon.png"
 
 [rendering]

@@ -19,251 +19,281 @@ static func _search_recursively(path: String, file_name: String):
   
   return ''
 
-static func _read_transform(buffer: StreamPeerBuffer) -> Transform:
-  var xx := buffer.get_float()
-  var xz := buffer.get_float()
-  var xy := buffer.get_float()
-  var x := Vector3(xx, xy, xz)
-  var yx := buffer.get_float()
-  var yz := buffer.get_float()
-  var yy := buffer.get_float()
-  var y := Vector3(yx, yy, yz)
-  var zx := buffer.get_float()
-  var zz := buffer.get_float()
-  var zy := buffer.get_float()
-  var z := Vector3(zx, zy, zz)
-  var transform := Transform(
-    x, y, z,
-    Vector3(buffer.get_float(), buffer.get_float(), buffer.get_float())
-  )
-  for _i in range(4): buffer.get_float()
+class WOMSkinData:
+  var joint_ind: int
+  var bind_matrix: Matrix4x4
+  var bind_matrix_inv: Matrix4x4
+  var vertex_inds := [] # int[]
+  var weights := [] # float[]
+
+class WOMJointData:
+  var name: String
+  var parent_ind: int
+  var is_child_of_blend: bool
+  var bind_matrix: Matrix4x4
+  var bind_offset: Matrix4x4
+
+class WOMMaterialData:
+  var name: String
+  var texture_name: String
+  var emission: Color
+  var shininess: float
+  var specular: Color
+  var transparency_color: Color
+
+class WOMMeshData:
+  var name: String
+  var vertex_colors := [] # Color[]
+  var tangents := [] # Vector3[]
+  var binormals := [] # Vector3[]
+  var vertices := [] # Vector3[]
+  var normals := [] # Vector3[]
+  var uvs := [] # Vector2[]
+  var triangles := [] # int[]
+  var material_datas := [] # WOMMaterialData[]
+  var skin_datas := [] # WOMSkinData[]
+
+class WOMModelData:
+  var name: String
+  var mesh_datas := [] # WOMMeshData[]
+  var joint_datas := [] # WOMJointData[]
+
+static func _load_model_data(gd_unzip, model_path: String) -> WOMModelData:
+  var dir_path := model_path.substr(0, model_path.find_last('/'))
+  var model_name := model_path.substr(model_path.find_last('/') + 1, model_path.length())
+  var wom_model_data := WOMModelData.new()
   
-  return transform
+  var buf := ExtendedStreamPeerBuffer.new()
+  buf.data_array = gd_unzip.uncompress(model_path)
+  
+  wom_model_data.name = model_name
+  
+  # Mesh data
+  var mesh_count = buf.get_32()
+  for mesh_ind in range(mesh_count):
+    var wom_mesh_data := WOMMeshData.new()
+    wom_model_data.mesh_datas.push_back(wom_mesh_data)
+    
+    var has_tangents := buf.get_8() == 1
+    var has_binormals := buf.get_8() == 1
+    var has_vertex_colors := buf.get_8() == 1
+    wom_mesh_data.name = buf.get_string()
+    var vertex_count := buf.get_32()
+
+    for vertex_ind in range(vertex_count):
+      wom_mesh_data.vertices.push_back(buf.get_vector3())
+      wom_mesh_data.normals.push_back(buf.get_vector3())
+      wom_mesh_data.uvs.push_back(buf.get_vector2())
+
+      if has_vertex_colors:
+        wom_mesh_data.vertex_colors.push_back(buf.get_rgb())
+
+      if has_tangents:
+        wom_mesh_data.tangents.push_back(buf.get_vector3())
+
+      if has_binormals:
+        wom_mesh_data.binormals.push_back(buf.get_vector3())
+
+    var triangle_count := buf.get_32()
+    for triangle_ind in range(triangle_count):
+      wom_mesh_data.triangles.push_back(buf.get_16())
+    
+    # Material data
+    var material_count := buf.get_32()
+    
+    for material_ind in range(material_count):
+      var wom_material_data := WOMMaterialData.new()
+      wom_mesh_data.material_datas.push_back(wom_material_data)
+      
+      wom_material_data.texture_name = buf.get_string().replace('.dds', '.tres')
+      wom_material_data.name = buf.get_string()
+      
+      var has_material_properties := buf.get_8() == 1
+      if has_material_properties:
+        var has_emissive := buf.get_8() == 1
+        if has_emissive:
+          wom_material_data.emission = buf.get_rgba()
+          
+        var has_shininess := buf.get_8() == 1
+        if has_shininess:
+          wom_material_data.shininess = buf.get_float()
+          
+        var has_specular := buf.get_8() == 1
+        if has_specular:
+          wom_material_data.specular = buf.get_rgba()
+          
+        var has_transparency_color := buf.get_8() == 1
+        if has_transparency_color:
+          wom_material_data.transparency_color = buf.get_rgba()
+          
+  # Joint data
+  var joint_count := buf.get_32()
+  var joint_names := [] # String[]
+  for joint_ind in range(joint_count):
+    var wom_joint_data := WOMJointData.new()
+    wom_model_data.joint_datas.push_back(wom_joint_data)
+    
+    var parent_name := buf.get_string()
+    wom_joint_data.name = buf.get_string()
+    joint_names.push_back(wom_joint_data.name)
+    wom_joint_data.parent_ind = joint_names.find(parent_name)
+    wom_joint_data.is_child_of_blend = buf.get_bool()
+    wom_joint_data.bind_matrix = buf.get_matrix4x4()
+    wom_joint_data.bind_offset = buf.get_matrix4x4()
+    
+  for mesh_ind in range(mesh_count):
+    var wom_mesh_data: WOMMeshData = wom_model_data.mesh_datas[mesh_ind]
+    var has_skinning := buf.get_bool()
+    if has_skinning:
+      var skin_count := buf.get_32()
+      for skin_id in range(skin_count):
+        var joint_name := buf.get_string()
+        var joint_id := joint_names.find(joint_name)
+        if joint_id == -1: continue
+        
+        var wom_skin_data := WOMSkinData.new()
+        wom_mesh_data.skin_datas.push_back(wom_skin_data)
+        
+        wom_skin_data.joint_ind = joint_id
+        wom_skin_data.bind_matrix = buf.get_matrix4x4()
+        wom_skin_data.bind_matrix_inv = buf.get_matrix4x4()
+        
+        var number_of_weights := buf.get_32()
+        for i in range(number_of_weights):
+          wom_skin_data.vertex_inds.push_back(buf.get_32())
+          wom_skin_data.weights.push_back(buf.get_float())
+  
+  return wom_model_data
 
 static func _load_model(gd_unzip, model_path: String) -> WOMModel:
   var dir_path := model_path.substr(0, model_path.find_last('/'))
   var model_name := model_path.substr(model_path.find_last('/') + 1, model_path.length())
+  var wom_model_data := _load_model_data(gd_unzip, model_path)
   var wom_model := WOMModel.new()
+  wom_model.name = 'WOMModel'
   
-  var bytes: PoolByteArray = gd_unzip.uncompress(model_path)
-  
-  var buffer := StreamPeerBuffer.new()
-  buffer.data_array = bytes
-  
-  Logger.debug("buffer size: " + str(buffer.get_size()), Logger.DebugLevel.EXTREME)
-  
-  var mesh_count := buffer.get_32()
-  Logger.debug("mesh_count: " + str(mesh_count), Logger.DebugLevel.EXTREME)
-
-  for mesh_ind in range(mesh_count):
-    var mi := MeshInstance.new()
-    Logger.debug('mesh ' + str(mesh_ind), Logger.DebugLevel.EXTREME)
-
-    # Mesh data
-    var has_tangents := buffer.get_8() == 1
-    Logger.debug('has_tangents ' + str(has_tangents), Logger.DebugLevel.EXTREME)
-    var has_binormals := buffer.get_8() == 1
-    Logger.debug('has_binormals ' + str(has_binormals), Logger.DebugLevel.EXTREME)
-    var has_vertex_colors := buffer.get_8() == 1
-    Logger.debug('has_vertex_colors ' + str(has_vertex_colors), Logger.DebugLevel.EXTREME)
-    var name := buffer.get_string()
-    mi.name = name
-    Logger.debug('name ' + name, Logger.DebugLevel.EXTREME)
-    var vertex_count := buffer.get_32()
-    Logger.debug('vertex_count ' + str(vertex_count), Logger.DebugLevel.EXTREME)
-
-    var vertex_colors := []
-    var tangents := []
-    var binormals := []
-    var vertex_array := []
-    var normal_array := []
-    var uv_array := []
-
-    for vertex_ind in range(vertex_count):
-      vertex_array.push_back(Vector3(buffer.get_float(), buffer.get_float(), buffer.get_float()))
-      normal_array.push_back(Vector3(buffer.get_float(), buffer.get_float(), buffer.get_float()))
-      uv_array.push_back(Vector2(buffer.get_float(), buffer.get_float()))
-
-      if has_vertex_colors:
-        vertex_colors.push_back(Color(buffer.get_float(), buffer.get_float(), buffer.get_float()))
-
-      if has_tangents:
-        tangents.push_back(Vector3(buffer.get_float(), buffer.get_float(), buffer.get_float()))
-
-      if has_binormals:
-        binormals.push_back(Vector3(buffer.get_float(), buffer.get_float(), buffer.get_float()))
-
-    var triangles := []
-    var triangle_count := buffer.get_32()
-    Logger.debug('triangle_count ' + str(triangle_count), Logger.DebugLevel.EXTREME)
-    for triangle_ind in range(triangle_count):
-      triangles.push_back(buffer.get_16())
-    
-    var st := SurfaceTool.new()
-    st.begin(Mesh.PRIMITIVE_TRIANGLES)
-    for ind in range(triangle_count):
-      var triangle_ind: int = triangles[triangle_count - ind - 1]
-      st.add_normal(normal_array[triangle_ind])
-      st.add_uv(uv_array[triangle_ind])
-      if has_vertex_colors: st.add_color(vertex_colors[triangle_ind])
-#      if has_tangents: st.add_tangent()
-      st.add_vertex(vertex_array[triangle_ind])
-#    for ind in range(vertex_count):
-#      st.add_normal(normal_array[ind])
-#      st.add_uv(uv_array[ind])
-#      if has_vertex_colors: st.add_color(vertex_colors[ind])
-##      if has_tangents: st.add_tangent()
-#      st.add_vertex(vertex_array[ind])
-    var mesh := st.commit()
-    
-    # Material data
-    var material_count := buffer.get_32()
-    Logger.debug('material_count ' + str(material_count), Logger.DebugLevel.EXTREME)
-    
-    for material_ind in range(material_count):
-      Logger.debug('material ' + str(material_ind), Logger.DebugLevel.EXTREME)
-    
-      var texture_name := buffer.get_string()
-      Logger.debug('texture_name ' + texture_name, Logger.DebugLevel.EXTREME)
-      var material_name := buffer.get_string()
-      Logger.debug('material_name ' + material_name, Logger.DebugLevel.EXTREME)
-      var has_material_properties := buffer.get_8() == 1
-      Logger.debug('has_material_properties ' + str(has_material_properties), Logger.DebugLevel.EXTREME)
-      
-      if has_material_properties:
-        var has_emissive := buffer.get_8() == 1
-        Logger.debug('has_emissive ' + str(has_emissive), Logger.DebugLevel.EXTREME)
-        var emissive: Color
-        if has_emissive:
-          emissive = Color(buffer.get_float(), buffer.get_float(), buffer.get_float(), buffer.get_float())
-          Logger.debug('emissive ' + str(emissive), Logger.DebugLevel.EXTREME)
-          
-        var has_shininess := buffer.get_8() == 1
-        Logger.debug('has_shininess ' + str(has_shininess), Logger.DebugLevel.EXTREME)
-        var shininess: float
-        if has_shininess:
-          shininess = buffer.get_float()
-          Logger.debug('shininess ' + str(shininess), Logger.DebugLevel.EXTREME)
-          
-        var has_specular := buffer.get_8() == 1
-        Logger.debug('has_specular ' + str(has_specular), Logger.DebugLevel.EXTREME)
-        var specular: Color
-        if has_specular:
-          specular = Color(buffer.get_float(), buffer.get_float(), buffer.get_float(), buffer.get_float())
-          Logger.debug('specular ' + str(specular), Logger.DebugLevel.EXTREME)
-          
-        var has_transparency_color := buffer.get_8() == 1
-        Logger.debug('has_transparency_color ' + str(has_transparency_color), Logger.DebugLevel.EXTREME)
-        var transparency_color: Color
-        if has_transparency_color:
-          transparency_color = Color(buffer.get_float(), buffer.get_float(), buffer.get_float(), buffer.get_float())
-          Logger.debug('transparency_color ' + str(transparency_color), Logger.DebugLevel.EXTREME)
-          
-        var material := SpatialMaterial.new()
-        if texture_name != '':
-          var material_path := 'user://content/textures/' + dir_path + '/' + texture_name.replace('.dds', '.tres')
-          var dir := Directory.new()
-          if !dir.file_exists(material_path):
-            print(material_path + ' does not exist, searching recursively')
-            material_path = _search_recursively('user://content/textures', texture_name)
-            
-          print(material_path)
-          material.set_texture(SpatialMaterial.TEXTURE_ALBEDO, load(material_path))
-          print('user://content/textures/' + dir_path + '/' + texture_name.replace('.dds', '_n.tres'))
-          if dir.file_exists('user://content/textures/' + dir_path + '/' + texture_name.replace('.dds', '_n.tres')):
-            print('normal exists')
-            material.normal_enabled = true
-            material.set_texture(SpatialMaterial.TEXTURE_NORMAL, load('user://content/textures/' + dir_path + '/' + texture_name.replace('.dds', '_n.tres')))
-        else:
-          print('TEXTURE_NAME = "" NEEDS HANDLING')
-          
-        if has_emissive && (emissive.r > 0 || emissive.g > 0 || emissive.b > 0):
-          material.emission_enabled = true
-          material.emission = emissive
-        if has_shininess:
-          if shininess > 1.0: shininess /= 128.0
-          material.roughness = 1.0 - shininess
-        if has_specular:
-          material.metallic = specular.v
-        if has_transparency_color:
-          material.flags_transparent = true
-          material.params_depth_draw_mode = SpatialMaterial.DEPTH_DRAW_ALPHA_OPAQUE_PREPASS
-        mesh.surface_set_material(material_ind, material)
-    
-    mi.mesh = mesh
-    wom_model.add_child(mi)
-    mi.set_owner(wom_model)
-    mi.hide()
-    
-    var name_lower := name.to_lower()
-    if 'lod1' in name_lower:
-      wom_model.lod1_model_name = name
-    elif 'lod2' in name_lower:
-      wom_model.lod2_model_name = name
-    elif 'lod3' in name_lower:
-      wom_model.lod3_model_name = name
-    elif 'pickingbox' in name_lower:
-      wom_model.picking_box_model_name = name
-    elif 'boundingbox' in name_lower:
-      wom_model.bounding_box_model_name = name
-    elif 'submesh' in name_lower:
-      pass
-    elif 'collisionmesh' in name_lower:
-      pass
-    else:
-      mi.show()
-      wom_model.model_names.push_back(name)
-
   var skeleton: Skeleton
-  var joint_count := buffer.get_32()
-  if joint_count > 0:
+  if wom_model_data.joint_datas.size() > 0:
     skeleton = Skeleton.new()
     skeleton.name = 'Skeleton'
     wom_model.add_child(skeleton)
     skeleton.set_owner(wom_model)
     
-    for mi in wom_model.get_children():
-      if (!mi is MeshInstance): continue
-      
-      mi.skeleton = NodePath('../Skeleton')
+    var any_is_child_of_blend := false
+    for joint_data in wom_model_data.joint_datas:
+      if joint_data.is_child_of_blend: any_is_child_of_blend = true
+      var bone_ind := skeleton.get_bone_count()
+      skeleton.add_bone(joint_data.name)
+      if joint_data.parent_ind != -1:
+        skeleton.set_bone_parent(bone_ind, joint_data.parent_ind)
+      skeleton.set_bone_rest(bone_ind, joint_data.bind_offset.get_transform())
+    print(model_path, any_is_child_of_blend)
+  
+  for mesh_data in wom_model_data.mesh_datas:
+#    print('mesh: ', mesh_data.name)
+    var mesh_instance := MeshInstance.new()
+    mesh_instance.name = mesh_data.name
+    wom_model.add_child(mesh_instance)
+    mesh_instance.set_owner(wom_model)
+    mesh_instance.hide()
+    if skeleton != null && mesh_data.skin_datas.size() > 0:
+      mesh_instance.skeleton = NodePath('../Skeleton')
     
-    for i in range(joint_count):
-      var parent_name := buffer.get_string()
-      var name := buffer.get_string()
-      var is_child_of_blend := buffer.get_8() != 0
-      var bind_matrix := _read_transform(buffer)
-      var bind_offset := _read_transform(buffer)
-      
-      var bone_id := skeleton.get_bone_count()
-      skeleton.add_bone(name)
-      if parent_name != '':
-        skeleton.set_bone_parent(bone_id, skeleton.find_bone(parent_name))
-      skeleton.set_bone_rest(bone_id, bind_matrix)
-      print('joint = ')
-      print(parent_name)
-      print(name)
-      print(is_child_of_blend)
-      print(bind_matrix)
-      print(bind_offset)
+    var vertex_bones := [] # int[4][]
+    vertex_bones.resize(mesh_data.vertices.size())
+    var vertex_weights := [] # float[4][]
+    vertex_weights.resize(mesh_data.vertices.size())
     
-  var does_any_mesh_have_skinning := false
-  for mesh_id in range(mesh_count):
-    var has_skinning := buffer.get_8() != 0
-    if has_skinning:
-      does_any_mesh_have_skinning = true
+    for skin_data in mesh_data.skin_datas:
+#      print('skin_data: ', wom_model_data.joint_datas[skin_data.joint_ind].name)
       
-      var skin_count := buffer.get_32()
-      for skin_id in range(skin_count):
-        var joint_name := buffer.get_string()
-        var bind_matrix := _read_transform(buffer)
-        var bind_matrix_inv := _read_transform(buffer)
+      for i in range(skin_data.vertex_inds.size()):
+        var vertex_ind: int = skin_data.vertex_inds[i]
+        var weight: float = skin_data.weights[i]
+#        print('vertex ', vertex_ind, ', weight ', weight)
         
+        if !vertex_bones[vertex_ind]:
+          vertex_bones[vertex_ind] = []
+          vertex_weights[vertex_ind] = []
+        if vertex_bones[vertex_ind].size() > 4: continue
         
+        vertex_bones[vertex_ind].push_back(skin_data.joint_ind)
+        vertex_weights[vertex_ind].push_back(weight)
     
+    var surface_tool := SurfaceTool.new()
+    surface_tool.begin(Mesh.PRIMITIVE_TRIANGLES)
     
+    var has_vertex_colors: bool = mesh_data.vertex_colors.size() > 0
+    var has_tangents: bool = mesh_data.tangents.size() > 0
+    var has_binormals: bool = mesh_data.binormals.size() > 0
+    var triangle_count: int = mesh_data.triangles.size()
+    for i in range(triangle_count):
+      var vertex_ind: int = mesh_data.triangles[triangle_count - i - 1]
+#      print('vertex ', vertex_ind)
+      if vertex_bones[vertex_ind] != null:
+#        print('bones: ', vertex_bones[vertex_ind])
+#        print('weights: ', vertex_weights[vertex_ind])
+        surface_tool.add_bones(vertex_bones[vertex_ind])
+        surface_tool.add_weights(vertex_weights[vertex_ind])
+      surface_tool.add_normal(mesh_data.normals[vertex_ind])
+      surface_tool.add_uv(mesh_data.uvs[vertex_ind])
+      if has_vertex_colors:
+        surface_tool.add_color(mesh_data.vertex_colors[vertex_ind])
+      surface_tool.add_vertex(mesh_data.vertices[vertex_ind])
+      
+      
+    mesh_instance.mesh = surface_tool.commit()
     
+    var name_lower: String = mesh_data.name.to_lower()
+    if 'lod1' in name_lower:
+      wom_model.lod1_model_names.push_back(mesh_data.name)
+    elif 'lod2' in name_lower:
+      wom_model.lod2_model_names.push_back(mesh_data.name)
+    elif 'lod3' in name_lower:
+      wom_model.lod3_model_names.push_back(mesh_data.name)
+    elif 'pickingbox' in name_lower:
+      wom_model.picking_box_model_name = mesh_data.name
+    elif 'boundingbox' in name_lower:
+      wom_model.bounding_box_model_name = mesh_data.name
+    elif 'submesh' in name_lower:
+      pass
+    elif 'collisionmesh' in name_lower:
+      pass
+    else:
+      mesh_instance.show()
+      wom_model.model_names.push_back(mesh_data.name)
+      
 
-  Logger.debug("buffer size: " + str(buffer.get_size()), Logger.DebugLevel.EXTREME)
+    # Material data
+    var dir := Directory.new()
+    for material_ind in range(mesh_data.material_datas.size()):
+      var material_data: WOMMaterialData = mesh_data.material_datas[material_ind]
+      var texture_name := material_data.texture_name
+      var material_name := material_data.name
+    
+      var material := SpatialMaterial.new()
+      if texture_name != '':
+        var texture_path := 'user://content/textures/' + dir_path + '/' + texture_name
+        if !dir.file_exists(texture_path):
+          print(texture_path + ' does not exist, searching recursively')
+          texture_path = _search_recursively('user://content/textures', texture_name)
+        
+        if !dir.file_exists(texture_path):
+          print(texture_path + ' does not exist, after searching recursively')
+          continue
+        
+        material.set_texture(SpatialMaterial.TEXTURE_ALBEDO, load(texture_path))
+    
+      if material_data.emission:
+        material.emission_enabled = true
+        material.emission = material_data.emission
+      material.roughness = (100 - material_data.shininess) / 100.0
+      if material_data.specular:
+        material.metallic = material_data.specular.r
+      if material_data.transparency_color:
+        material.flags_transparent = true
+        material.params_depth_draw_mode = SpatialMaterial.DEPTH_DRAW_ALPHA_OPAQUE_PREPASS
+      mesh_instance.mesh.surface_set_material(material_ind, material)
   
   var properties_unc = gd_unzip.uncompress(dir_path + '/properties.xml')
   var properties_xml = properties_unc if properties_unc else PoolByteArray()
@@ -282,21 +312,8 @@ static func _load_model(gd_unzip, model_path: String) -> WOMModel:
           current_key += '>'
         current_key += xml_parser.get_node_name()
         
-#        print('current_key: ', current_key)
-      elif node_type == XMLParser.NODE_ELEMENT_END:
+      if node_type == XMLParser.NODE_ELEMENT_END || (node_type == XMLParser.NODE_ELEMENT && xml_parser.is_empty()):
         current_key = current_key.substr(0, current_key.find_last('>'))
-        
-#        print('current_key: ', current_key)
-        
-#      if xml_parser.get_node_type() == XMLParser.NODE_TEXT:
-#        print(xml_parser.get_node_data())
-#      else:
-#        print(xml_parser.get_node_name())
-      
-      if node_type == XMLParser.NODE_ELEMENT && xml_parser.is_empty():
-        current_key = current_key.substr(0, current_key.find_last('>'))
-        
-#        print('current_key: ', current_key)
 
       if node_type == XMLParser.NODE_TEXT && current_key.begins_with('properties>' + model_name + '>'):
         var node_data := xml_parser.get_node_data().strip_edges()
@@ -318,20 +335,85 @@ static func _load_model(gd_unzip, model_path: String) -> WOMModel:
       wom_model.lod1_distance = model_properties.get('lod1', 0.0)
       wom_model.lod2_distance = model_properties.get('lod2', 0.0)
       wom_model.lod3_distance = model_properties.get('lod3', 0.0)
+    
+    if properties.has('anim'):
+      var animation_player := AnimationPlayer.new()
+      wom_model.add_child(animation_player)
+      animation_player.set_owner(wom_model)
+      animation_player.name = 'AnimationPlayer'
+      
+      var model_anims: Dictionary = properties['anim']
+      for anim_key in model_anims.keys():
+        
+        var anim := _load_anim(gd_unzip, dir_path + '/' + model_anims[anim_key]['file'], anim_key, wom_model_data)
+        animation_player.add_animation(anim_key, anim)
   
   return wom_model
 
-static func _load_anim(gd_unzip, anim_path: String):
+static func _load_anim(gd_unzip, anim_path: String, anim_name: String, wom_model_data: WOMModelData) -> Animation:
   var dir_path := anim_path.substr(0, anim_path.find_last('/'))
-  var anim_name := anim_path.substr(anim_path.find_last('/') + 1, anim_path.length())
-  var wom_model := WOMModel.new()
+  var anim_file_name := anim_path.substr(anim_path.find_last('/') + 1, anim_path.length())
+  var animation := Animation.new()
   
-  var bytes: PoolByteArray = gd_unzip.uncompress(anim_path)
+  print('anim ', anim_name, anim_path)
   
-  var buffer := StreamPeerBuffer.new()
-  buffer.data_array = bytes
+  var buf := ExtendedStreamPeerBuffer.new()
+  buf.data_array = gd_unzip.uncompress(anim_path)
   
-  Logger.debug("buffer size: " + str(buffer.get_size()), Logger.DebugLevel.EXTREME)
+  var length := 0.0
+  var joint_count := buf.get_32()
+  for j in range(joint_count):
+    var joint_name := buf.get_string()
+    var track_ind := animation.add_track(Animation.TYPE_TRANSFORM)
+    animation.track_set_path(track_ind, NodePath('Skeleton:' + joint_name))
+    var keyframe_count := buf.get_32()
+    
+#    print(anim_name)
+    print(joint_name)
+    var joint_data: WOMJointData
+    for jd in wom_model_data.joint_datas:
+      if jd.name == joint_name:
+        joint_data = jd
+        break
+    
+    if joint_data == null:
+      for k in range(keyframe_count):
+        var animation_matrix := buf.get_matrix4x4()
+        var time := buf.get_float()
+      continue
+    
+#    print('bind_matrix: ', joint_data.bind_matrix.get_position(), ' ', joint_data.bind_matrix.get_scale(), ' ', joint_data.bind_matrix.get_quaternion().get_euler())
+#    print('bind_offset: ', joint_data.bind_offset.get_position(), ' ', joint_data.bind_offset.get_scale(), ' ', joint_data.bind_offset.get_quaternion().get_euler())
+    
+    var first_matrix: Matrix4x4
+    for k in range(keyframe_count):
+      var animation_matrix := buf.get_matrix4x4()
+#      print(animation_matrix.get_position(), ' / ', animation_matrix.get_scale(), ' / ', joint_data.bind_matrix.get_position(), ' / ', joint_data.bind_matrix.get_scale())
+      var time := buf.get_float()
+      
+      if time > length:
+        length = time
+        
+      if k == 0:
+        first_matrix = animation_matrix
+      
+      if k == keyframe_count - 1:
+        animation_matrix = first_matrix
+      
+#      print('animation_matrix: ', animation_matrix.get_position(), ' ', animation_matrix.get_scale(), ' ', animation_matrix.get_quaternion().get_euler())
+      
+      animation.transform_track_insert_key(track_ind, time, 
+#        (animation_matrix.get_position() * joint_data.bind_matrix.get_scale()) - (joint_data.bind_matrix.get_position() * joint_data.bind_matrix.get_scale()),
+#        Quat(animation_matrix.get_quaternion().get_euler() - joint_data.bind_matrix.get_quaternion().get_euler()),
+        (animation_matrix.get_position() * animation_matrix.get_scale()) - (joint_data.bind_offset.get_position() * joint_data.bind_offset.get_scale()),
+        animation_matrix.get_quaternion(),
+#        animation_matrix.get_position() - joint_data.bind_matrix.get_position(), 
+#        Quat(animation_matrix.get_quaternion().get_euler() - joint_data.bind_matrix.get_quaternion().get_euler()),
+        Vector3.ONE
+      )
+  
+  animation.length = length
+  return animation
   
 
 static func load_wom(gd_unzip, model_path: String):
@@ -341,178 +423,3 @@ static func load_wom(gd_unzip, model_path: String):
     return false
   else:
     return _load_model(gd_unzip, model_path)
-  
-  
-#
-#  class_name WOMLoader
-#
-#static func _search_recursively(path: String, file_name: String):
-#  var dir := Directory.new()
-#  dir.open(path)
-#  dir.list_dir_begin(true)
-#
-#  while true:
-#    var fn = dir.get_next()
-#    if fn == "":
-#      break
-#    elif fn == file_name:
-#      return path + '/' + fn
-#    elif dir.dir_exists(path + '/' + fn):
-#      var rfn = _search_recursively(path + '/' + fn, file_name)
-#      if rfn != '': return rfn
-#
-#  dir.list_dir_end()
-#
-#  return ''
-#
-#class WOMMeshData:
-#  var name: String
-#  var mesh: Mesh
-#
-#static func load_wom(path: String):
-#  var split_path := path.split('/')
-#  if split_path[split_path.size() - 2].to_lower() == 'anim': return
-#  if path.to_lower().ends_with('anim.wom'): return
-#  split_path.remove(split_path.size() - 1)
-#  var dir_path := split_path.join('/')
-#
-#  Logger.debug("Loading WOM: " + path, Logger.DebugLevel.VERBOSE)
-#  var file := File.new()
-#  file.open(path, File.READ)
-#  var buffer := StreamPeerBuffer.new()
-#  buffer.data_array = file.get_buffer(file.get_len())
-#  file.close()
-#
-#  Logger.debug("buffer size: " + str(buffer.get_size()), Logger.DebugLevel.EXTREME)
-#
-#  var mesh_count := buffer.get_32()
-#  Logger.debug("mesh_count: " + str(mesh_count), Logger.DebugLevel.EXTREME)
-#
-#  for mesh_ind in range(mesh_count):
-#    Logger.debug('mesh ' + str(mesh_ind), Logger.DebugLevel.EXTREME)
-#
-#    # Mesh data
-#    var has_tangents := buffer.get_8() == 1
-#    Logger.debug('has_tangents ' + str(has_tangents), Logger.DebugLevel.EXTREME)
-#    var has_binormals := buffer.get_8() == 1
-#    Logger.debug('has_binormals ' + str(has_binormals), Logger.DebugLevel.EXTREME)
-#    var has_vertex_colors := buffer.get_8() == 1
-#    Logger.debug('has_vertex_colors ' + str(has_vertex_colors), Logger.DebugLevel.EXTREME)
-#    var name := buffer.get_string()
-#    Logger.debug('name ' + name, Logger.DebugLevel.EXTREME)
-#    var vertex_count := buffer.get_32()
-#    Logger.debug('vertex_count ' + str(vertex_count), Logger.DebugLevel.EXTREME)
-#
-#    var vertex_colors := []
-#    var tangents := []
-#    var binormals := []
-#    var vertex_array := []
-#    var normal_array := []
-#    var uv_array := []
-#
-#    for vertex_ind in range(vertex_count):
-#      vertex_array.push_back(Vector3(buffer.get_float(), buffer.get_float(), buffer.get_float()))
-#      normal_array.push_back(Vector3(buffer.get_float(), buffer.get_float(), buffer.get_float()))
-#      uv_array.push_back(Vector2(buffer.get_float(), buffer.get_float()))
-#
-#      if has_vertex_colors:
-#        vertex_colors.push_back(Color(buffer.get_float(), buffer.get_float(), buffer.get_float()))
-#
-#      if has_tangents:
-#        tangents.push_back(Vector3(buffer.get_float(), buffer.get_float(), buffer.get_float()))
-#
-#      if has_binormals:
-#        binormals.push_back(Vector3(buffer.get_float(), buffer.get_float(), buffer.get_float()))
-#
-#    var triangles := []
-#    var triangle_count := buffer.get_32()
-#    Logger.debug('triangle_count ' + str(triangle_count), Logger.DebugLevel.EXTREME)
-#    for triangle_ind in range(triangle_count):
-#      triangles.push_back(buffer.get_16())
-#
-#    var st := SurfaceTool.new()
-#    st.begin(Mesh.PRIMITIVE_TRIANGLES)
-#    for ind in range(triangle_count):
-#      var triangle_ind: int = triangles[triangle_count - ind - 1]
-#      st.add_normal(normal_array[triangle_ind])
-#      st.add_uv(uv_array[triangle_ind])
-#      if has_vertex_colors: st.add_color(vertex_colors[triangle_ind])
-##      if has_tangents: st.add_tangent()
-#      st.add_vertex(vertex_array[triangle_ind])
-##    for ind in range(vertex_count):
-##      st.add_normal(normal_array[ind])
-##      st.add_uv(uv_array[ind])
-##      if has_vertex_colors: st.add_color(vertex_colors[ind])
-###      if has_tangents: st.add_tangent()
-##      st.add_vertex(vertex_array[ind])
-#    var mesh := st.commit()
-#
-#    # Material data
-#    var material_count := buffer.get_32()
-#    Logger.debug('material_count ' + str(material_count), Logger.DebugLevel.EXTREME)
-#
-#    for material_ind in range(material_count):
-#      Logger.debug('material ' + str(material_ind), Logger.DebugLevel.EXTREME)
-#
-#      var texture_name := buffer.get_string()
-#      Logger.debug('texture_name ' + texture_name, Logger.DebugLevel.EXTREME)
-#      var material_name := buffer.get_string()
-#      Logger.debug('material_name ' + material_name, Logger.DebugLevel.EXTREME)
-#      var has_material_properties := buffer.get_8() == 1
-#      Logger.debug('has_material_properties ' + str(has_material_properties), Logger.DebugLevel.EXTREME)
-#
-#      if has_material_properties:
-#        var has_emissive := buffer.get_8() == 1
-#        Logger.debug('has_emissive ' + str(has_emissive), Logger.DebugLevel.EXTREME)
-#        var emissive: Color
-#        if has_emissive:
-#          emissive = Color(buffer.get_float(), buffer.get_float(), buffer.get_float(), buffer.get_float())
-#          Logger.debug('emissive ' + str(emissive), Logger.DebugLevel.EXTREME)
-#
-#        var has_shininess := buffer.get_8() == 1
-#        Logger.debug('has_shininess ' + str(has_shininess), Logger.DebugLevel.EXTREME)
-#        var shininess: float
-#        if has_shininess:
-#          shininess = buffer.get_float()
-#          Logger.debug('shininess ' + str(shininess), Logger.DebugLevel.EXTREME)
-#
-#        var has_specular := buffer.get_8() == 1
-#        Logger.debug('has_specular ' + str(has_specular), Logger.DebugLevel.EXTREME)
-#        var specular: Color
-#        if has_specular:
-#          specular = Color(buffer.get_float(), buffer.get_float(), buffer.get_float(), buffer.get_float())
-#          Logger.debug('specular ' + str(specular), Logger.DebugLevel.EXTREME)
-#
-#        var has_transparency_color := buffer.get_8() == 1
-#        Logger.debug('has_transparency_color ' + str(has_transparency_color), Logger.DebugLevel.EXTREME)
-#        var transparency_color: Color
-#        if has_transparency_color:
-#          transparency_color = Color(buffer.get_float(), buffer.get_float(), buffer.get_float(), buffer.get_float())
-#          Logger.debug('transparency_color ' + str(transparency_color), Logger.DebugLevel.EXTREME)
-#
-#        var material := SpatialMaterial.new()
-#        var material_path := dir_path + '/' + texture_name
-#        var dir := Directory.new()
-#        if !dir.file_exists(material_path):
-#          print(material_path + ' does not exist, searching recursively')
-#          material_path = _search_recursively('res://graphics', texture_name)
-#
-#        print(material_path)
-#        material.set_texture(SpatialMaterial.TEXTURE_ALBEDO, load(material_path))
-#        if has_emissive:
-#          material.emission_enabled = true
-#          material.emission = emissive
-#        if has_shininess:
-#          material.roughness = (100 - shininess) / 100.0
-#        if has_specular:
-#          material.metallic = specular.r
-#        if has_transparency_color:
-#          material.flags_transparent = true
-#          material.params_depth_draw_mode = SpatialMaterial.DEPTH_DRAW_ALPHA_OPAQUE_PREPASS
-#        mesh.surface_set_material(material_ind, material)
-#
-#    ResourceSaver.save('res://gfx/test-' + path.replace(':', '').replace('/', '_') + '-' + str(mesh_ind) + '.tres', mesh)
-#
-#
-#  Logger.debug("buffer size: " + str(buffer.get_size()), Logger.DebugLevel.EXTREME)
-#

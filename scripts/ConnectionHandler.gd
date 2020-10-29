@@ -2,58 +2,6 @@ class_name ConnectionHandler
 
 extends Node
 
-# PACKETS
-#
-# -52 = steam auth
-#   in: success: bool, err_msg: string16
-#
-# -18 = status?
-#   in: status: string8
-#
-# -16 = set item empty
-#   in: inventory: 64, item: 64
-#
-# -15 = login
-#   in: success: bool, login_status: string16, layer: 8, wurm_time_seconds: 64,
-#       server_time_msec: 64, y_rot: float, x: float, y: float, h: float,
-#       model: string16, power: 8, command_type: 8, retry_in_seconds: 16,
-#       face: 64, kingdom_id: 8, teleport_counter: 32, blood_kingdom: 8,
-#       bridge_id: 64, ground_offset: float, world_size: 32
-#
-# 26 = fight style
-#   in: style: byte
-#
-# 29 = set item has items
-#   in: inventory: 64, item: 64
-#
-# 32 = speed modifier
-#   in: mod: float
-#
-# 68 = update inventory item
-#   in: inventory: 64, id: 64, parent_id: 64, name: string8,
-#       description: string8, quality: float, dmg: float, weight: 32, 
-#       (has_colour: bool, r: 8, g: 8, b: 8), (has_price: bool, price: 32), 
-#       (can_improve: bool, improve_image_number: 16), temperature: 8, 
-#       rarity: 8, material: 8, image_number: 16
-#
-# 76 = add to inventory
-#   in: inventory: 64, parent_id: 64, id: 64, image_number: 16, name: string8,
-#       hover_text: string8, description: string8, quality: float, dmg: float,
-#       weight: 32, (has_colour: bool, r: 8, g: 8, b: 8), (has_price: bool,
-#       price: 32), (can_improve: bool, improve_image_number: 16), profile?: 16,
-#       material: 8, temperature: 8, rarity: 8, aux_data: 8
-#
-# 99 = message
-#   in: window: string8, r: 8, g: 8, b: 8, message: string16, message_type: 8
-#
-# 106 = form
-#   in: index: 8, id: 16, title: string8, width: 16, height: 16, x: float,
-#       y: float, can_resize: bool, can_close: bool, r: 8, g: 8, b: 8,
-#       max_parts: 8, content: string16
-#     THEN MULTIPLE
-#       index: 8, content: string16
-
-
 var ip_address: String
 var port: int
 var steam_id: String = '0' #'WR:test'
@@ -64,7 +12,7 @@ var server_password: String
 var stream_peer := StreamPeerTCP.new()
 var encryption_service := EncryptionService.new()
 
-var write_buffer := StreamPeerBuffer.new()
+var write_buffer := ExtendedStreamPeerBuffer.new()
 var write_buffer_mutex := Mutex.new()
 
 var last_update := 0
@@ -72,37 +20,13 @@ var last_update := 0
 var _new_seed := 0
 var _new_seed_pointer := 0
 
-var _num_one := 0 # some debug value only used for tilestrips
-
 onready var world: WurmWorld = $"../WurmWorld"
 onready var bmls: Control = $"../GUI/BMLs"
 
 func _init():
   write_buffer.big_endian = true
 
-func _put_string(buf: StreamPeerBuffer, string: String, len_bits := 8):
-  var length := string.length()
-  if len_bits == 8: buf.put_8(length)
-  elif len_bits == 16: buf.put_16(length)
-  elif len_bits == 32: buf.put_32(length)
-  elif len_bits == 64: buf.put_64(length)
-  else: return
-  
-  buf.put_data(string.to_utf8())
-
-func _get_string(buf: StreamPeerBuffer, len_bits := 8) -> String:
-  var length: int
-  if len_bits == 8: length = OverflowService.as_u8(buf.get_8())
-  elif len_bits == 16: length = OverflowService.as_u16(buf.get_16())
-  elif len_bits == 32: length = buf.get_32()
-  elif len_bits == 64: length = buf.get_64()
-  else: return ''
-  
-  var bytes = buf.get_data(length)[1]
-  return PoolByteArray(bytes).get_string_from_utf8()
-
-func connect_to_server(ip_address: String, port: int, server_password: String,
-                       username: String):
+func connect_to_server(ip_address: String, port: int, server_password: String, username: String):
   self.ip_address = ip_address
   self.port = port
   self.server_password = server_password
@@ -110,17 +34,17 @@ func connect_to_server(ip_address: String, port: int, server_password: String,
   
   var err := stream_peer.connect_to_host(ip_address, port)
   if err != OK:
-    print('failed to connect, err: ' + str(err))
+    Logger.error('Failed to connect to server. (' + str(err) + ')')
     return
   
-  print('connecting')
+  Logger.info('Connecting to server ' + ip_address + ':' + str(port) + ' as ' + username + '.')
   while(stream_peer.get_status() == stream_peer.STATUS_CONNECTING):
     OS.delay_msec(100)
   
   if (stream_peer.get_status() == stream_peer.STATUS_ERROR):
-    print('failed to connect')
+    Logger.error('An error occurred while connecting to server.')
     return
-  print('connected ' + str(stream_peer.get_status()))
+  Logger.info('Connected to server.')
 
   stream_peer.big_endian = true
   stream_peer.set_no_delay(true)
@@ -128,7 +52,7 @@ func connect_to_server(ip_address: String, port: int, server_password: String,
   _send_steam_auth()
 
 func _write_packet(bytes: PoolByteArray):
-  var packet_buf := StreamPeerBuffer.new()
+  var packet_buf := ExtendedStreamPeerBuffer.new()
   packet_buf.big_endian = true
   packet_buf.put_16(bytes.size())
   packet_buf.put_data(bytes)
@@ -138,26 +62,23 @@ func _write_packet(bytes: PoolByteArray):
   write_buffer_mutex.unlock()
 
 func _send_steam_auth():
-  # TODO: Make this actually authenticate, it doesn't matter if it doesn't do it
-  #       through steam, as long as the server accepts the connection.
+  # TODO: Make this actually authenticate, it doesn't matter if it doesn't do it through steam, as long as the server 
+  #       accepts the connection.
   # 
-  #       One idea to get this to work nicely would be to write a server mod for
-  #       it, the mod would require you to type /wrauth from a client 
-  #       authenticated via Steam (ie. the official WU client), that command 
-  #       would give you a key, which will link your client to your Steam 
-  #       account.
+  #       One idea to get this to work nicely would be to write a server mod for it, the mod would require you to type
+  #       /wrauth from a client authenticated via Steam (ie. the official WU client), that command would give you a key,
+  #       which will link your client to your Steam account.
   #
-  #       Doing it this way means you still need to buy the game, so the WU devs
-  #       shouldn't be angry with it.
+  #       Doing it this way means you still need to buy the game, so the WU devs shouldn't be angry with it.
   
-  var data_buf := StreamPeerBuffer.new()
+  var data_buf := ExtendedStreamPeerBuffer.new()
   data_buf.big_endian = true
   
   # steam auth packet id
   data_buf.put_8(-52)
   
   # steam id
-  _put_string(data_buf, steam_id)
+  data_buf.put_string_8(steam_id)
   
   # auth ticket
   data_buf.put_64(4)
@@ -173,7 +94,7 @@ func _send_steam_auth():
   _write_packet(data_buf.data_array)
 
 func _send_login():
-  var data_buf := StreamPeerBuffer.new()
+  var data_buf := ExtendedStreamPeerBuffer.new()
   data_buf.big_endian = true
   
   # login packet id
@@ -183,39 +104,39 @@ func _send_login():
   data_buf.put_32(250990585)
   
   # username
-  _put_string(data_buf, username)
+  data_buf.put_string_8(username)
   
   # password
-  _put_string(data_buf, password)
+  data_buf.put_string_8(password)
   
   # server password
-  _put_string(data_buf, server_password)
+  data_buf.put_string_8(server_password)
   
   # steam id
-  _put_string(data_buf, steam_id)
+  data_buf.put_string_8(steam_id)
   
   # extra tile data?
   data_buf.put_8(0)
   
   _write_packet(data_buf.data_array)
 
-func _recv_steam_auth(buf: StreamPeerBuffer):
+func _recv_steam_auth(buf: ExtendedStreamPeerBuffer):
   var success := buf.get_8() == 1
   if !success:
-    var err_msg := _get_string(buf, 16)
+    var err_msg := buf.get_string_16()
     
-    print('STEAM AUTH FAILED. ' + err_msg)
+    Logger.debug_extreme('STEAM AUTH FAILED. ' + err_msg)
     return
 
   _send_login()
 
 # SimpleServerConnectionClass:3395
-func _recv_login(buf: StreamPeerBuffer):
+func _recv_login(buf: ExtendedStreamPeerBuffer):
   var success := buf.get_8() == 1
-  var login_status := _get_string(buf, 16)
+  var login_status := buf.get_string_16()
   
   if !success:
-    print('LOGIN FAILED. ' + login_status)
+    Logger.debug_extreme('LOGIN FAILED. ' + login_status)
     return
   
   var layer := buf.get_8()
@@ -225,7 +146,7 @@ func _recv_login(buf: StreamPeerBuffer):
   var x := buf.get_float()
   var y := buf.get_float()
   var h := buf.get_float()
-  var model := _get_string(buf, 16)
+  var model := buf.get_string_16()
   var power := buf.get_8()
   var command_type := buf.get_8()
   var retry_in_seconds := buf.get_16()
@@ -248,34 +169,34 @@ func _recv_login(buf: StreamPeerBuffer):
   player.kingdom_id = kingdom_id
   player.blood_kingdom_id = blood_kingdom
 
-func _recv_set_status(buf: StreamPeerBuffer):
-  var status := _get_string(buf)
-  print('SET_STATUS status: ' + status)
+func _recv_set_status(buf: ExtendedStreamPeerBuffer):
+  var status := buf.get_string_8()
+  Logger.debug_extreme('SET_STATUS status: ' + status)
 
-func _recv_set_item_is_empty(buf: StreamPeerBuffer):
+func _recv_set_item_is_empty(buf: ExtendedStreamPeerBuffer):
   var inventory_id := buf.get_64()
   var item_id := buf.get_64()
-  print('SET_ITEM_IS_EMPTY inventory_id: ' + str(inventory_id) + ', item_id: ' + str(item_id))
+  Logger.debug_extreme('SET_ITEM_IS_EMPTY inventory_id: ' + str(inventory_id) + ', item_id: ' + str(item_id))
 
-func _recv_set_fight_style(buf: StreamPeerBuffer):
+func _recv_set_fight_style(buf: ExtendedStreamPeerBuffer):
   var style := buf.get_8()
-  print('SET_FIGHT_STYLE style: ' + str(style))
+  Logger.debug_extreme('SET_FIGHT_STYLE style: ' + str(style))
 
-func _recv_set_item_has_items(buf: StreamPeerBuffer):
+func _recv_set_item_has_items(buf: ExtendedStreamPeerBuffer):
   var inventory_id := buf.get_64()
   var item_id := buf.get_64()
-  print('SET_ITEM_HAS_ITEMS inventory_id: ' + str(inventory_id) + ', item_id: ' + str(item_id))
+  Logger.debug_extreme('SET_ITEM_HAS_ITEMS inventory_id: ' + str(inventory_id) + ', item_id: ' + str(item_id))
 
-func _recv_set_speed_modifier(buf: StreamPeerBuffer):
+func _recv_set_speed_modifier(buf: ExtendedStreamPeerBuffer):
   var mod := buf.get_float()
-  print('SET_SPEED_MODIFIER mod: ' + str(mod))
+  Logger.debug_extreme('SET_SPEED_MODIFIER mod: ' + str(mod))
 
-func _recv_update_inventory_item(buf: StreamPeerBuffer):
+func _recv_update_inventory_item(buf: ExtendedStreamPeerBuffer):
   var inventory_id := buf.get_64()
   var item_id := buf.get_64()
   var parent_id := buf.get_64()
-  var name := _get_string(buf)
-  var description := _get_string(buf)
+  var name := buf.get_string_8()
+  var description := buf.get_string_8()
   var quality := buf.get_float()
   var damage := buf.get_float()
   var weight := buf.get_32()
@@ -299,20 +220,21 @@ func _recv_update_inventory_item(buf: StreamPeerBuffer):
   var rarity := buf.get_8()
   var material := buf.get_8()
   var image_number := buf.get_16()
-  print('UPDATE_INVENTORY_ITEM inventory_id: ' + str(inventory_id) + ', item_id: ' + str(item_id) + ', parent_id: ' + str(parent_id) + ',')
-  print('    name: ' + name + ', description: ' + description + ',')
-  print('    quality: ' + str(quality) + ', damage: ' + str(damage) + ', weight: ' + str(weight) + ', r: ' + str(r) + ', g: ' + str(g) + ', b: ' + str(b) + ',')
-  print('    price: ' + str(price) + ', improve_image_number: ' + str(improve_image_number) + ', temperature: ' + str(temperature) + ',')
-  print('    rarity: ' + str(rarity) + ', material: ' + str(material) + ', image_number: ' + str(image_number))
+  Logger.debug_extreme('UPDATE_INVENTORY_ITEM inventory_id: ' + str(inventory_id) + ', item_id: ' + str(item_id) + 
+    ', parent_id: ' + str(parent_id) + ', name: ' + name + ', description: ' + description + 
+    ', quality: ' + str(quality) + ', damage: ' + str(damage) + ', weight: ' + str(weight) + ', r: ' + str(r) + 
+    ', g: ' + str(g) + ', b: ' + str(b) + ', price: ' + str(price) + 
+    ', improve_image_number: ' + str(improve_image_number) + ', temperature: ' + str(temperature) + 
+    ', rarity: ' + str(rarity) + ', material: ' + str(material) + ', image_number: ' + str(image_number))
 
-func _recv_add_to_inventory(buf: StreamPeerBuffer):
+func _recv_add_to_inventory(buf: ExtendedStreamPeerBuffer):
   var inventory_id := buf.get_64()
   var parent_id := buf.get_64()
   var item_id := buf.get_64()
   var image_number := buf.get_16()
-  var name := _get_string(buf)
-  var hover_text := _get_string(buf)
-  var description := _get_string(buf)
+  var name := buf.get_string_8()
+  var hover_text := buf.get_string_8()
+  var description := buf.get_string_8()
   var quality := buf.get_float()
   var damage := buf.get_float()
   var weight := buf.get_32()
@@ -337,67 +259,75 @@ func _recv_add_to_inventory(buf: StreamPeerBuffer):
   var temperature := buf.get_8()
   var rarity := buf.get_8()
   var aux_data := buf.get_8()
-  print('ADD_TO_INVENTORY inventory_id: ' + str(inventory_id) + ', item_id: ' + str(item_id) + ', parent_id: ' + str(parent_id) + ',')
-  print('    name: ' + name + ', description: ' + description + ',')
-  print('    quality: ' + str(quality) + ', damage: ' + str(damage) + ', weight: ' + str(weight) + ', r: ' + str(r) + ', g: ' + str(g) + ', b: ' + str(b) + ',')
-  print('    price: ' + str(price) + ', improve_image_number: ' + str(improve_image_number) + ', temperature: ' + str(temperature) + ',')
-  print('    rarity: ' + str(rarity) + ', material: ' + str(material) + ', image_number: ' + str(image_number))
-  print('    hover_text: ' + hover_text + ', profile: ' + str(profile) + ', aux_data: ' + str(aux_data))
+  Logger.debug_extreme('ADD_TO_INVENTORY inventory_id: ' + str(inventory_id) + ', item_id: ' + str(item_id) + 
+    ', parent_id: ' + str(parent_id) + ', name: ' + name + ', description: ' + description + 
+    ', quality: ' + str(quality) + ', damage: ' + str(damage) + ', weight: ' + str(weight) + ', r: ' + str(r) + 
+    ', g: ' + str(g) + ', b: ' + str(b) + ', price: ' + str(price) + 
+    ', improve_image_number: ' + str(improve_image_number) + ', temperature: ' + str(temperature) + 
+    ', rarity: ' + str(rarity) + ', material: ' + str(material) + ', image_number: ' + str(image_number) + 
+    ', hover_text: ' + hover_text + ', profile: ' + str(profile) + ', aux_data: ' + str(aux_data))
 
-func _recv_message(buf: StreamPeerBuffer):
-  var window := _get_string(buf)
+func _recv_message(buf: ExtendedStreamPeerBuffer):
+  var window := buf.get_string_8()
   var r := buf.get_8()
   var g := buf.get_8()
   var b := buf.get_8()
-  var message := _get_string(buf, 16)
+  var message := buf.get_string_16()
   var message_type := buf.get_8()
-  print('MESSAGE window: ' + window + ', r: ' + str(r) + ', g: ' + str(g) + ', b: ' + str(b))
-  print('    message: ' + message, ', message_type: ' + str(message_type))
+  Logger.debug_extreme('MESSAGE window: ' + window + ', r: ' + str(r) + ', g: ' + str(g) + ', b: ' + str(b) +
+    ', message: ' + message + ', message_type: ' + str(message_type))
 
-var _last_partial_form: String
-var _last_partial_form_parts: int
-func _recv_form(buf: StreamPeerBuffer):
+class BMLData:
+  var id: int
+  var title: String
+  var width: int
+  var height: int
+  var x: float
+  var y: float
+  var can_resize: bool
+  var can_close: bool
+  var r: int
+  var g: int
+  var b: int
+  var max_parts: int
+  var content: String
+
+func _open_bml(bml_data: BMLData):
+  var bml_node := BMLParser.parse(bml_data.content)
+  bmls.add_child(bml_node)
+  var vp_size := get_viewport().size
+  var pos := Vector2((vp_size.x * bml_data.x) - (bml_data.width / 2), (vp_size.y * bml_data.y) - (bml_data.height / 2))
+  bml_node.popup(Rect2(pos, Vector2(bml_data.width, bml_data.height)))
+  bml_node.window_title = bml_data.title
+  bml_node.resizable = bml_data.can_resize
+  if !bml_data.can_close: bml_node.get_close_button().hide()
+  bml_node.connect('button_pressed', self, '_bml_button_pressed')
+
+var _partial_bml: BMLData
+func _recv_form(buf: ExtendedStreamPeerBuffer):
   var part := buf.get_8()
   if part == 1:
-    var id := buf.get_16()
-    var title := _get_string(buf)
-    var width := buf.get_16()
-    var height := buf.get_16()
-    var x := buf.get_float()
-    var y := buf.get_float()
-    var can_resize := buf.get_8() == 1
-    var can_close := buf.get_8() == 1
-    var r := buf.get_8()
-    var g := buf.get_8()
-    var b := buf.get_8()
-    var max_parts := buf.get_8()
-    var content := _get_string(buf, 16)
+    _partial_bml = BMLData.new()
+    _partial_bml.id = buf.get_16()
+    _partial_bml.title = buf.get_string_8()
+    _partial_bml.width = buf.get_16()
+    _partial_bml.height = buf.get_16()
+    _partial_bml.x = buf.get_float()
+    _partial_bml.y = buf.get_float()
+    _partial_bml.can_resize = buf.get_8() == 1
+    _partial_bml.can_close = buf.get_8() == 1
+    _partial_bml.r = buf.get_8()
+    _partial_bml.g = buf.get_8()
+    _partial_bml.b = buf.get_8()
+    _partial_bml.max_parts = buf.get_8()
+  _partial_bml.content = buf.get_string_16()
     
-    print('FORM id: ', id, ', title: ', title, ', width: ', width, ', height: ', height, ', x: ', x, ', y: ', y, ',')
-    print('    can_resize: ', can_resize, ', can_close: ', can_close, ', r: ', r, ', g: ', g, ', b: ', b, ', max_parts: ', max_parts, ',')
-    print('    content: ', content)
-    
-    var bml_node := BMLParser.parse(content)
-    bmls.add_child(bml_node)
-    var vp_size := get_viewport().size
-    bml_node.popup(Rect2((vp_size.x * x) - (width / 2), (vp_size.y * y) - (height / 2), width, height))
-    bml_node.window_title = title
-    bml_node.resizable = can_resize
-    if !can_close: bml_node.get_close_button().hide()
-    bml_node.connect('button_pressed', self, '_bml_button_pressed')
-  else:
-    var content := _get_string(buf, 16)
-    
-    print('FORM part: ', part, ', content: ', content)
-# 106 = form
-#   in: part: 8, id: 16, title: string8, width: 16, height: 16, x: float,
-#       y: float, can_resize: bool, can_close: bool, r: 8, g: 8, b: 8,
-#       max_parts: 8, content: string16
-#     THEN MULTIPLE
-#       part: 8, content: string16
+  if part == _partial_bml.max_parts:
+    _open_bml(_partial_bml)
+    _partial_bml = null
 
 func _bml_button_pressed(button_pressed: String, value_dict: Dictionary):
-  var data_buf := StreamPeerBuffer.new()
+  var data_buf := ExtendedStreamPeerBuffer.new()
   data_buf.big_endian = true
   
   # bml packet id
@@ -405,7 +335,7 @@ func _bml_button_pressed(button_pressed: String, value_dict: Dictionary):
   
   data_buf.put_8(1)
   
-  _put_string(data_buf, button_pressed)
+  data_buf.put_string_8(button_pressed)
   
   var values := value_dict.values()
   var keys := value_dict.keys()
@@ -414,119 +344,128 @@ func _bml_button_pressed(button_pressed: String, value_dict: Dictionary):
   data_buf.put_16(value_count)
   
   for i in range(value_count):
-    _put_string(data_buf, keys[i])
-    _put_string(data_buf, values[i], 16)
+    data_buf.put_string_8(keys[i])
+    data_buf.put_string_16(values[i])
   
   _write_packet(data_buf.data_array)
 
-func _recv_toggle_switch(buf: StreamPeerBuffer):
-  var toggle := buf.get_8() & 255
-  var value := buf.get_8() & 255
+func _recv_toggle_switch(buf: ExtendedStreamPeerBuffer):
+  var toggle := buf.get_u8()
+  var value := buf.get_u8()
   
-  print('TOGGLE_SWITCH toggle: ', toggle, ', value: ', value)
+  Logger.debug_extreme('TOGGLE_SWITCH toggle: ' + str(toggle) +', value: ' + str(value))
 
-func _recv_set_skill(buf: StreamPeerBuffer):
+func _recv_set_skill(buf: ExtendedStreamPeerBuffer):
   var parent_id := buf.get_64()
   var id := buf.get_64()
-  var name := _get_string(buf)
+  var name := buf.get_string_8()
   var value := buf.get_float()
   var max_value := buf.get_float()
   var affinities := buf.get_8()
   
-  print('SET_SKILL parent_id: ', parent_id, ', id: ', id, ', name: ', name, ', value: ', value, ', max_value: ', max_value, ', affinities: ', affinities)
+  Logger.debug_extreme('SET_SKILL parent_id: ' + str(parent_id) + ', id: ' + str(id) + ', name: ' + name +
+    ', value: ' + str(value) + ', max_value: ' + str(max_value) + ', affinities: ' + str(affinities))
 
-func _recv_send_map_info(buf: StreamPeerBuffer):
-  var server_name := _get_string(buf)
+func _recv_send_map_info(buf: ExtendedStreamPeerBuffer):
+  var server_name := buf.get_string_8()
   var cluster := buf.get_8()
   var is_epic := cluster != 0
   
-  print('SEND_MAP_INFO server_name: ', server_name, ', cluster: ', cluster, ', is_epic: ', is_epic)
+  Logger.debug_extreme('SEND_MAP_INFO server_name: ' + server_name + ', cluster: ' + str(cluster) + 
+    ', is_epic: ' + str(is_epic))
 
-func _recv_map_annotations(buf: StreamPeerBuffer):
+func _recv_map_annotations(buf: ExtendedStreamPeerBuffer):
   var add_remove_type := buf.get_8()
   
   match add_remove_type:
     0:
-      var count := OverflowService.as_u16(buf.get_16())
+      var count := buf.get_u16()
       
       for i in range(count):
         var id := buf.get_64()
         var type := buf.get_8()
-        var server_name := _get_string(buf, 16)
-        var x := OverflowService.as_u16(buf.get_16())
-        var y := OverflowService.as_u16(buf.get_16())
-        var annotation_name := _get_string(buf, 16)
+        var server_name := buf.get_string_16()
+        var x := buf.get_u16()
+        var y := buf.get_u16()
+        var annotation_name := buf.get_string_16()
         var icon_id := buf.get_8()
         
-        print('MAP_ANNOTATION ADD id: ', id, ', type: ', type, ', server_name: ', server_name, ', x: ', x, ', y: ', y, ', annotation_name: ', annotation_name, ', icon_id: ', icon_id)
+        Logger.debug_extreme('MAP_ANNOTATION ADD id: ' + str(id) + ', type: ' + str(type) + 
+          ', server_name: ' + server_name + ', x: ' + str(x) + ', y: ' + str(y) + 
+          ', annotation_name: ' + annotation_name + ', icon_id: ' + str(icon_id))
     1:
       var id := buf.get_64()
       var type := buf.get_8()
-      var server_name := _get_string(buf, 16)
+      var server_name := buf.get_string_16()
       
-      print('MAP_ANNOTATION REMOVE id: ', id, ', type: ', type, ', server_name: ', server_name)
+      Logger.debug_extreme('MAP_ANNOTATION REMOVE id: ' + str(id) + ', type: ' + str(type) + 
+        ', server_name: ' + server_name)
     2:
       var has_village_permission := buf.get_8() != 0
       var has_alliance_permission := buf.get_8() != 0
       
-      print('MAP_ANNOTATION PERMISSIONS has_village_permission: ', has_village_permission, ', has_alliance_permission: ', has_alliance_permission)
+      Logger.debug_extreme('MAP_ANNOTATION PERMISSIONS has_village_permission: ' + str(has_village_permission) +
+        ', has_alliance_permission: ' + str(has_alliance_permission))
     3:
       var type := buf.get_8()
       
-      print('MAP_ANNOTATION CLEAR_TYPE type: ', type)
+      Logger.debug_extreme('MAP_ANNOTATION CLEAR_TYPE type: ' + str(type))
 
-func _recv_ticket_add(buf: StreamPeerBuffer):
+func _recv_ticket_add(buf: ExtendedStreamPeerBuffer):
   var num := buf.get_32()
   
   for i in range(num):
     var ticket_no := buf.get_64()
     var ticket_group_id := buf.get_8()
-    var message := _get_string(buf)
+    var message := buf.get_string_8()
     var colour_code := buf.get_8()
-    var description := _get_string(buf, 16)
+    var description := buf.get_string_16()
     
-    print('TICKET_ADD ticket_no: ', ticket_no, ', ticket_group_id: ', ticket_group_id, ', message: ', message, ', colour_code: ', colour_code, ', description: ', description)
+    Logger.debug_extreme('TICKET_ADD ticket_no: ' + str(ticket_no) + ', ticket_group_id: ' + str(ticket_group_id) +
+      ', message: ' + message + ', colour_code: ' + str(colour_code) + ', description: ' + description)
     
     var num_actions := buf.get_8()
     
     for j in range(num_actions):
       var action_no := buf.get_32()
-      var msg := _get_string(buf)
-      var desc := _get_string(buf)
+      var msg := buf.get_string_8()
+      var desc := buf.get_string_8()
       
-      print('TICKET_ADD ACTION action_no: ', action_no, ', msg: ', msg, ', desc: ', desc)
+      Logger.debug_extreme('TICKET_ADD ACTION action_no: ' + str(action_no) + ', msg: ' + msg + ', desc: ' + desc)
 
-func _recv_update_friends_list(buf: StreamPeerBuffer):
+func _recv_update_friends_list(buf: ExtendedStreamPeerBuffer):
   var player_status := buf.get_8()
   if buf.get_available_bytes() == 0 && player_status == 4:
-    print('UPDATE_FRIENDS_LIST CLEAR_LIST')
+    Logger.debug_extreme('UPDATE_FRIENDS_LIST CLEAR_LIST')
   else:
-    var player_name := _get_string(buf)
+    var player_name := buf.get_string_8()
     var last_seen := buf.get_64()
-    var player_server := _get_string(buf)
+    var player_server := buf.get_string_8()
     var has_note := buf.get_available_bytes() != 0
     var note := ''
     if has_note:
-      note = _get_string(buf)
+      note = buf.get_string_8()
     
-    print('UPDATE_FRIENDS_LIST UPDATE player_name: ', player_name, ', last_seen: ', last_seen, ', player_server: ', player_server, ', note: ', note)
+    Logger.debug_extreme('UPDATE_FRIENDS_LIST UPDATE player_name: ' + player_name + ', last_seen: ' + str(last_seen) +
+      ', player_server: ' + player_server + ', note: ' + note)
 
-func _recv_weather_update(buf: StreamPeerBuffer):
+func _recv_weather_update(buf: ExtendedStreamPeerBuffer):
   var cloudiness := buf.get_float()
   var fog := buf.get_float()
   var rain := buf.get_float()
   var wind_rot := buf.get_float()
   var wind_power := buf.get_float()
   
-  print('WEATHER UPDATE cloudiness: ', cloudiness, ', fog: ', fog, ', rain: ', rain, ', wind_rot: ', wind_rot, ', wind_power: ', wind_power)
+  Logger.debug_extreme('WEATHER UPDATE cloudiness: ' + str(cloudiness) + ', fog: ' + str(fog) + ', rain: ' + str(rain) +
+    ', wind_rot: ' + str(wind_rot) + ', wind_power: ' + str(wind_power))
 
-func _recv_item_model_name(buf: StreamPeerBuffer):
+func _recv_item_model_name(buf: ExtendedStreamPeerBuffer):
   var item_id := buf.get_32()
-  var model_name := _get_string(buf)
+  var model_name := buf.get_string_8()
   
-  print('ITEM_MODEL_NAME item_id: ', item_id, ', model_name: ', model_name)
+  Logger.debug_extreme('ITEM_MODEL_NAME item_id: ' + str(item_id) + ', model_name: ' + model_name)
 
-func _recv_add_clothing(buf: StreamPeerBuffer):
+func _recv_add_clothing(buf: ExtendedStreamPeerBuffer):
   var wurm_id := buf.get_64()
   var item_id := buf.get_32()
   var body_part := buf.get_8()
@@ -548,113 +487,126 @@ func _recv_add_clothing(buf: StreamPeerBuffer):
   var material := buf.get_8()
   var rarity := buf.get_8()
   
-  print('ADD_CLOTHING wurm_id: ', wurm_id, ', item_id: ', item_id, ', body_part: ', body_part, ', r: ', r, ', g: ', g, ', b: ', b, ', r1: ', r1, ', g1: ', g1, ', b1: ', b1, ', material: ', material, ', rarity: ', rarity)
+  Logger.debug_extreme('ADD_CLOTHING wurm_id: ' + str(wurm_id) + ', item_id: ' + str(item_id) +
+    ', body_part: ' + str(body_part) + ', r: ' + str(r) + ', g: ' + str(g) + ', b: ' + str(b) + ', r1: ' + str(r1) +
+    ', g1: ' + str(g1) + ', b1: ' + str(b1) + ', material: ' + str(material) + ', rarity: ' + str(rarity))
 
-func _recv_climb(buf: StreamPeerBuffer):
+func _recv_climb(buf: ExtendedStreamPeerBuffer):
   var should_climb := buf.get_8() != 0
   
-  print('CLIMB should_climb: ', should_climb)
+  Logger.debug_extreme('CLIMB should_climb: ' + str(should_climb))
 
-func _recv_new_achievement(buf: StreamPeerBuffer):
+func _recv_new_achievement(buf: ExtendedStreamPeerBuffer):
   var is_new := buf.get_8() == 1
   var should_play_sound_on_update := buf.get_8() == 1
   var id := buf.get_32()
-  var name := _get_string(buf)
-  var description := _get_string(buf)
+  var name := buf.get_string_8()
+  var description := buf.get_string_8()
   var type := buf.get_8()
   var time_achieved := buf.get_64()
   var counter := buf.get_32()
   
-  print('NEW_ACHIEVEMENT is_new: ', is_new, ', should_play_sound_on_update: ', should_play_sound_on_update, ', id: ', id, ', name: ', name, ', description: ', description, ', type: ', type, ', time_achieved: ', time_achieved, ', counter: ', counter)
+  Logger.debug_extreme('NEW_ACHIEVEMENT is_new: ' + str(is_new) +
+    ', should_play_sound_on_update: ' + str(should_play_sound_on_update) + ', id: ' + str(id) + ', name: ' + name +
+    ', description: ' + description + ', type: ' + str(type) + ', time_achieved: ' + str(time_achieved) +
+    ', counter: ' + str(counter))
 
-func _recv_join_group(buf: StreamPeerBuffer):
-  var group := _get_string(buf)
-  var name := _get_string(buf)
+func _recv_join_group(buf: ExtendedStreamPeerBuffer):
+  var group := buf.get_string_8()
+  var name := buf.get_string_8()
   var player_id := buf.get_64()
   
-  print('JOIN_GROUP group: ', group, ', name: ', name, ', player_id: ', player_id)
+  Logger.debug_extreme('JOIN_GROUP group: ' + group + ', name: ' + name + ', player_id: ' + str(player_id))
 
-func _recv_set_creature_attitude(buf: StreamPeerBuffer):
+func _recv_set_creature_attitude(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
-  var attitude := OverflowService.as_u8(buf.get_8())
+  var attitude := buf.get_u8()
   
-  print('SET_CREATURE_ATTITUDE id: ', id, ', attitude: ', attitude)
+  Logger.debug_extreme('SET_CREATURE_ATTITUDE id: ' + str(id) + ', attitude: ' + str(attitude))
 
-func _recv_send_all_kingdoms(buf: StreamPeerBuffer):
+func _recv_send_all_kingdoms(buf: ExtendedStreamPeerBuffer):
   var count := buf.get_32()
   
   for i in range(count):
     var id := buf.get_8()
-    var name := _get_string(buf)
-    var suffix := _get_string(buf)
+    var name := buf.get_string_8()
+    var suffix := buf.get_string_8()
     
-    print('SEND_ALL_KINGDOMS id: ', id, ', name: ', name, ', suffix: ', suffix)
+    Logger.debug_extreme('SEND_ALL_KINGDOMS id: ' + str(id) + ', name: ' + name + ', suffix: ' + suffix)
 
-func _recv_achievement_list(buf: StreamPeerBuffer):
+func _recv_achievement_list(buf: ExtendedStreamPeerBuffer):
   var count := buf.get_32()
   
   for i in range(count):
     var id := buf.get_32()
-    var name := _get_string(buf)
-    var description := _get_string(buf)
+    var name := buf.get_string_8()
+    var description := buf.get_string_8()
     var type := buf.get_8()
     var time_achieved := buf.get_64()
     var counter := buf.get_32()
     
-    print('ACHIEVEMENT_LIST id: ', id, ', name: ', name, ', description: ', description, ', type: ', type, ', time_achieved: ', time_achieved, ', counter: ', counter)
+    Logger.debug_extreme('ACHIEVEMENT_LIST id: ' + str(id) + ', name: ' + name + ', description: ' + description +
+      ', type: ' + str(type) + ', time_achieved: ' + str(time_achieved) + ', counter: ' + str(counter))
 
-func _recv_personal_goal_list(buf: StreamPeerBuffer):
+func _recv_personal_goal_list(buf: ExtendedStreamPeerBuffer):
   var type := buf.get_8()
   
   match type:
     1:
       var parent_id := buf.get_8()
       var is_complete := buf.get_8() == 1
-      var name := _get_string(buf, 16)
-      var hover_string := _get_string(buf, 16)
+      var name := buf.get_string_16()
+      var hover_string := buf.get_string_16()
       
-      print('PERSONAL_GOAL_LIST ADD_TIER parent_id: ', parent_id, ', is_complete: ', is_complete, ', name: ', name, ', hover_string: ', hover_string)
+      Logger.debug_extreme('PERSONAL_GOAL_LIST ADD_TIER parent_id: ' + str(parent_id) +
+        ', is_complete: ' + str(is_complete) + ', name: ' + name + ', hover_string: ' + hover_string)
       
       var count := buf.get_32()
       for i in range(count):
         var ach_id := buf.get_32()
-        var ach_name := _get_string(buf, 16)
-        var ach_hover := _get_string(buf, 16)
+        var ach_name := buf.get_string_16()
+        var ach_hover := buf.get_string_16()
         var completion_percent := buf.get_8()
         var is_ach_complete := completion_percent == -1
         
-        print('PERSONAL_GOAL_LIST ADD_ACH ach_id: ', ach_id, ', ach_name: ', ach_name, ', ach_hover: ', ach_hover, ', completion_percent: ', completion_percent, ', is_ach_complete: ', is_ach_complete)
+        Logger.debug_extreme('PERSONAL_GOAL_LIST ADD_ACH ach_id: ' + str(ach_id) + ', ach_name: ' + ach_name +
+          ', ach_hover: ' + ach_hover + ', completion_percent: ' + str(completion_percent) +
+          ', is_ach_complete: ' + str(is_ach_complete))
     2:
       var parent_id := buf.get_8()
       var is_complete := buf.get_8() == 1
-      var name := _get_string(buf, 16)
+      var name := buf.get_string_16()
       
-      print('PERSONAL_GOAL_LIST UPDATE_TIER parent_id: ', parent_id, ', is_complete: ', is_complete, ', name: ', name)
+      Logger.debug_extreme('PERSONAL_GOAL_LIST UPDATE_TIER parent_id: ' + str(parent_id) +
+        ', is_complete: ' + str(is_complete) + ', name: ' + name)
     3:
       var ach_id := buf.get_32()
-      var ach_name := _get_string(buf, 16)
-      var ach_hover := _get_string(buf, 16)
+      var ach_name := buf.get_string_16()
+      var ach_hover := buf.get_string_16()
       var completion_percent := buf.get_8()
       var is_ach_complete := completion_percent == -1
       
-      print('PERSONAL_GOAL_LIST UPDATE_ACH ach_id: ', ach_id, ', ach_name: ', ach_name, ', ach_hover: ', ach_hover, ', completion_percent: ', completion_percent, ', is_ach_complete: ', is_ach_complete)
+      Logger.debug_extreme('PERSONAL_GOAL_LIST UPDATE_ACH ach_id: ' + str(ach_id) + ', ach_name: ' + ach_name +
+        ', ach_hover: ' + ach_hover + ', completion_percent: ' + str(completion_percent) +
+        ', is_ach_complete: ' + str(is_ach_complete))
     4:
       var parent_id := buf.get_8()
       var tutorial_id := buf.get_8()
-      var name := _get_string(buf, 16)
+      var name := buf.get_string_16()
       
-      print('PERSONAL_GOAL_LIST ADD_TUT parent_id: ', parent_id, ', tutorial_id: ', tutorial_id, ', name: ', name)
+      Logger.debug_extreme('PERSONAL_GOAL_LIST ADD_TUT parent_id: ' + str(parent_id) +
+      ', tutorial_id: ' + str(tutorial_id) + ', name: ' + name)
 
-func _recv_status_stamina(buf: StreamPeerBuffer):
-  var stamina := OverflowService.as_u16(buf.get_16())
-  var damage := OverflowService.as_u16(buf.get_16())
+func _recv_status_stamina(buf: ExtendedStreamPeerBuffer):
+  var stamina := buf.get_u16()
+  var damage := buf.get_u16()
   
   _new_seed |= (stamina & 1) << _new_seed_pointer
   _new_seed_pointer += 1
   
-  print('STATUS_STAMINA stamina: ', stamina / 65535.0, ', damage: ', damage / 65535.0)
+  Logger.debug_extreme('STATUS_STAMINA stamina: ' + str(stamina / 65535.0) + ', damage: ' + str(damage / 65535.0))
 
-func _recv_status_effect_bar(buf: StreamPeerBuffer):
+func _recv_status_effect_bar(buf: ExtendedStreamPeerBuffer):
   var type := buf.get_8()
   var id := buf.get_64()
   
@@ -664,30 +616,33 @@ func _recv_status_effect_bar(buf: StreamPeerBuffer):
       var duration := buf.get_32()
       var name := ''
       if buf.get_available_bytes() > 0:
-        name = _get_string(buf)
+        name = buf.get_string_8()
       
-      print('STATUS_EFFECT_BAR add id: ', id, ', type_id: ', type_id, ', duration: ', duration, ', name: ', name)
+      Logger.debug_extreme('STATUS_EFFECT_BAR add id: ' + str(id) + ', type_id: ' + str(type_id) +
+        ', duration: ' + str(duration) + ', name: ' + name)
     1:
-      print('STATUS_EFFECT_BAR remove id: ', id)
+      Logger.debug_extreme('STATUS_EFFECT_BAR remove id: ' + str(id))
 
-func _recv_remove_spell_effect(buf: StreamPeerBuffer):
+func _recv_remove_spell_effect(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
   
-  print('REMOVE_SPELL_EFFECT id: ', id)
+  Logger.debug_extreme('REMOVE_SPELL_EFFECT id: ' + str(id))
 
-func _recv_add_spell_effect(buf: StreamPeerBuffer):
+func _recv_add_spell_effect(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
-  var name := _get_string(buf)
+  var name := buf.get_string_8()
   var type := buf.get_8()
   var effect_type := buf.get_8()
   var influence := buf.get_8()
   var duration := buf.get_32()
   var power := buf.get_float()
   
-  print('ADD_SPELL_EFFECT id: ', id, ', name: ', name, ', type: ', type, ', effect_type: ', effect_type, ', influence: ', influence, ', duration: ', duration, ', power: ', power)
+  Logger.debug_extreme('ADD_SPELL_EFFECT id: ' + str(id) + ', name: ' + name + ', type: ' + str(type) +
+    ', effect_type: ' + str(effect_type) + ', influence: ' + str(influence) + ', duration: ' + str(duration) +
+    ', power: ' + str(power))
 
-func _recv_status_hunger(buf: StreamPeerBuffer):
-  var hunger := OverflowService.as_u16(buf.get_16()) / 65535.0
+func _recv_status_hunger(buf: ExtendedStreamPeerBuffer):
+  var hunger := buf.get_u16() / 65535.0
   var nutrition := buf.get_8()
   
   if buf.get_available_bytes() > 0:
@@ -696,49 +651,52 @@ func _recv_status_hunger(buf: StreamPeerBuffer):
     var fats := buf.get_8()
     var protein := buf.get_8()
     
-    print('STATUS_HUNGER with_sub hunger: ', hunger, ', nutrition: ', nutrition, ', calories: ', calories, ', carbs: ', carbs, ', fats: ', fats, ', protein: ', protein)
+    Logger.debug_extreme('STATUS_HUNGER with_sub hunger: ' + str(hunger) + ', nutrition: ' + str(nutrition) +
+      ', calories: ' + str(calories) + ', carbs: ' + str(carbs) + ', fats: ' + str(fats) + ', protein: ' + str(protein))
   else:
-    print('STATUS_HUNGER no_sub hunger: ', hunger, ', nutrition: ', nutrition)
+    Logger.debug_extreme('STATUS_HUNGER no_sub hunger: ' + str(hunger) + ', nutrition: ' + str(nutrition))
 
-func _recv_status_thirst(buf: StreamPeerBuffer):
-  var thirst := OverflowService.as_u16(buf.get_16()) / 65535.0
+func _recv_status_thirst(buf: ExtendedStreamPeerBuffer):
+  var thirst := buf.get_u16() / 65535.0
   
-  print('STATUS_THIRST thirst: ', thirst)
+  Logger.debug_extreme('STATUS_THIRST thirst: ' + str(thirst))
 
-func _recv_update_player_titles(buf: StreamPeerBuffer):
-  var title := _get_string(buf, 16)
-  var meditation_title := _get_string(buf, 16)
+func _recv_update_player_titles(buf: ExtendedStreamPeerBuffer):
+  var title := buf.get_string_16()
+  var meditation_title := buf.get_string_16()
   
-  print('UPDATE_PLAYER_TITLES title: ', title, ', meditation_title: ', meditation_title)
+  Logger.debug_extreme('UPDATE_PLAYER_TITLES title: ' + title + ', meditation_title: ' + meditation_title)
 
-func _recv_sleep_bonus_info(buf: StreamPeerBuffer):
+func _recv_sleep_bonus_info(buf: ExtendedStreamPeerBuffer):
   var status := buf.get_8()
   var seconds_left := buf.get_32()
   
-  print('SLEEP_BONUS_INFO status: ', status, ', seconds_left: ', seconds_left)
+  Logger.debug_extreme('SLEEP_BONUS_INFO status: ' + str(status) + ', seconds_left: ' + str(seconds_left))
 
-func _recv_add_effect(buf: StreamPeerBuffer):
+func _recv_add_effect(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
   var type := buf.get_16()
   var x := buf.get_float()
   var y := buf.get_float()
   var h := buf.get_float()
   var layer := buf.get_8()
-  var effect_name := '__UNSET__'
+  var effect_name := ''
   var timeout := -1.0
   var rotation_offset := 0.0
   
   if type == 27:
-    effect_name = _get_string(buf)
+    effect_name = buf.get_string_8()
     timeout = buf.get_float()
     rotation_offset = buf.get_float()
   
-  print('ADD_EFFECT id: ', id, ', type: ', type, ', x: ', x, ', y: ', y, ', h: ', h, ', layer: ', layer, ', effect_name: ', effect_name, ', timeout: ', timeout, ', rotation_offset: ', rotation_offset)
+  Logger.debug_extreme('ADD_EFFECT id: ' + str(id) + ', type: ' + str(type) + ', x: ' + str(x) + ', y: ' + str(y) +
+    ', h: ' + str(h) + ', layer: ' + str(layer) + ', effect_name: ' + effect_name + ', timeout: ' + str(timeout) +
+    ', rotation_offset: ' + str(rotation_offset))
 
-func _recv_set_equipment(buf: StreamPeerBuffer):
+func _recv_set_equipment(buf: ExtendedStreamPeerBuffer):
   var wurm_id := buf.get_64()
-  var slot := OverflowService.as_u8(buf.get_8())
-  var model := _get_string(buf, 16)
+  var slot := buf.get_u8()
+  var model := buf.get_string_16()
   var rarity := buf.get_8()
   var r := buf.get_float()
   var g := buf.get_float()
@@ -747,10 +705,11 @@ func _recv_set_equipment(buf: StreamPeerBuffer):
   var g1 := buf.get_float()
   var b1 := buf.get_float()
   
-  print('SET_EQUIPMENT wurm_id: ', wurm_id, ', slot: ', slot, ', model: ', model, ', rarity: ', rarity, ', r: ', r, ', g: ', g, ', b: ', b, ', r1: ', r1, ', g1: ', g1, ', b1: ', b1)
+  Logger.debug_extreme('SET_EQUIPMENT wurm_id: ' + str(wurm_id) + ', slot: ' + str(slot) + ', model: ' + model +
+    ', rarity: ' + str(rarity) + ', r: ' + str(r) + ', g: ' + str(g) + ', b: ' + str(b) + ', r1: ' + str(r1) +
+    ', g1: ' + str(g1) + ', b1: ' + str(b1))
 
-func _recv_tilestrip(buf: StreamPeerBuffer):
-  _num_one += 1
+func _recv_tilestrip(buf: ExtendedStreamPeerBuffer):
   var has_water := buf.get_8() != 0
   var has_extra := buf.get_8() != 0
   var y_start := buf.get_16()
@@ -776,29 +735,29 @@ func _recv_tilestrip(buf: StreamPeerBuffer):
 #    ', height: ', height, ', tiles: ', tiles, ', waters: ', waters, 
 #    ', extras: ', extra)
 
-func _recv_creature_layer(buf: StreamPeerBuffer):
+func _recv_creature_layer(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
   var layer := buf.get_8()
   
-  print('CREATURE_LAYER id: ', id, ', layer: ', layer)
+  Logger.debug_extreme('CREATURE_LAYER id: ' + str(id) + ', layer: ' + str(layer))
 
-func _recv_toggle_client_feature(buf: StreamPeerBuffer):
-  var type := OverflowService.as_u8(buf.get_8())
-  var value := OverflowService.as_u8(buf.get_8())
+func _recv_toggle_client_feature(buf: ExtendedStreamPeerBuffer):
+  var type := buf.get_u8()
+  var value := buf.get_u8()
   
-  print('TOGGLE_CLIENT_FEATURE type: ', type, ', value: ', value)
+  Logger.debug_extreme('TOGGLE_CLIENT_FEATURE type: ' + str(type) + ', value: ' + str(value))
 
-func _recv_add_creature(buf: StreamPeerBuffer):
+func _recv_add_creature(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
-  var model := _get_string(buf)
+  var model := buf.get_string_8()
   var solid := buf.get_8() == 1
   var y := buf.get_float()
   var x := buf.get_float()
   var bridge_id := buf.get_64()
   var rot := buf.get_float()
   var h := buf.get_float()
-  var name := _get_string(buf)
-  var hover_text := _get_string(buf)
+  var name := buf.get_string_8()
+  var hover_text := buf.get_string_8()
   var floating := (buf.get_8() & 15) == 1
   var layer := buf.get_8()
   var type := buf.get_8()
@@ -815,33 +774,32 @@ func _recv_add_creature(buf: StreamPeerBuffer):
   if buf.get_available_bytes() > 0:
     rarity = buf.get_8()
   
-  print('ADD_CREATURE id: ', id, ', model: ', model, ', solid: ', solid, 
-    ', x: ', x, ', y: ', y, ', bridge_id: ', bridge_id, ', rot: ', rot, 
-    ', h: ', h, ', name: ', name, ', hover_text: ', hover_text, 
-    ', floating: ', floating, ', layer: ', layer, ', type: ', type, 
-    ', material_id: ', material_id, ', sound_source_id: ', sound_source_id,
-    ', kingdom: ', kingdom, ', face: ', face, ', blood_kingdom: ', blood_kingdom,
-    ', mod_type: ', mod_type, ', rarity: ', rarity)
+  Logger.debug_extreme('ADD_CREATURE id: ' + str(id) + ', model: ' + model + ', solid: ' + str(solid) +
+    ', x: ' + str(x) + ', y: ' + str(y) + ', bridge_id: ' + str(bridge_id) + ', rot: ' + str(rot) + ', h: ' + str(h) +
+    ', name: ' + name + ', hover_text: ' + hover_text + ', floating: ' + str(floating) + ', layer: ' + str(layer) +
+    ', type: ' + str(type) + ', material_id: ' + str(material_id) + ', sound_source_id: ' + str(sound_source_id) +
+    ', kingdom: ' + str(kingdom) + ', face: ' + str(face) + ', blood_kingdom: ' + str(blood_kingdom) +
+    ', mod_type: ' + str(mod_type) + ', rarity: ' + str(rarity))
   
   var wom_model := ResourceResolver.load_model(model)
   wom_model.translation = Vector3(rand_range(-4, 4), rand_range(-4, 4), rand_range(-4, 4))
   world.add_child(wom_model)
 
-func _recv_resize(buf: StreamPeerBuffer):
+func _recv_resize(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
-  var x := OverflowService.as_u8(buf.get_8()) / 64.0
-  var y := OverflowService.as_u8(buf.get_8()) / 64.0
-  var z := OverflowService.as_u8(buf.get_8()) / 64.0
+  var x := buf.get_u8() / 64.0
+  var y := buf.get_u8() / 64.0
+  var z := buf.get_u8() / 64.0
   
-  print('RESIZE id: ', id, ', x: ', x, ', y: ', y, ', z: ', z)
+  Logger.debug_extreme('RESIZE id: ' + str(id) + ', x: ' + str(x) + ', y: ' + str(y) + ', z: ' + str(z))
 
-func _recv_set_creature_damage(buf: StreamPeerBuffer):
+func _recv_set_creature_damage(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
   var dmg := buf.get_float()
   
-  print('SET_CREATURE_DAMAGE id: ', id, ', dmg: ', dmg)
+  Logger.debug_extreme('SET_CREATURE_DAMAGE id: ' + str(id) + ', dmg: ' + str(dmg))
 
-func _recv_attach_effect(buf: StreamPeerBuffer):
+func _recv_attach_effect(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
   var type := buf.get_8()
   var data0 := buf.get_8()
@@ -849,59 +807,56 @@ func _recv_attach_effect(buf: StreamPeerBuffer):
   var data2 := buf.get_8()
   var data3 := buf.get_8()
   
-  print('ATTACH_EFFECT id: ', id, ', type: ', type, ', data0: ', data0,
-    ', data1: ', data1, ', data2: ', data2, ', data3: ', data3)
+  Logger.debug_extreme('ATTACH_EFFECT id: ' + str(id) + ', type: ' + str(type) + ', data0: ' + str(data0) +
+    ', data1: ' + str(data1) + ', data2: ' + str(data2) + ', data3: ' + str(data3))
 
-func _receive_item_or_corpse(creature_dead_id: int, buf: StreamPeerBuffer):
+func _receive_item_or_corpse(creature_dead_id: int, buf: ExtendedStreamPeerBuffer):
   var item_id := buf.get_64()
   var x := buf.get_float()
   var y := buf.get_float()
   var rot := buf.get_float()
   var h := buf.get_float()
-  var name := _get_string(buf)
-  var hover_text := _get_string(buf)
-  var model := _get_string(buf)
+  var name := buf.get_string_8()
+  var hover_text := buf.get_string_8()
+  var model := buf.get_string_8()
   var layer := buf.get_8()
   var material_id := buf.get_8()
-  var description := _get_string(buf)
+  var description := buf.get_string_8()
   var icon_id := buf.get_16()
   
-  # wtf?
   if buf.get_8() == 1:
-    buf.get_float()
-    buf.get_float()
+    buf.get_float() # QL
+    buf.get_float() # damage
   
   var scale := buf.get_float()
   var bridge_id := buf.get_64()
   var rarity := buf.get_8()
   var placeable := buf.get_8()
   var parent = buf.get_64() if placeable == 2 else -10
-  var extra1 := false
   var extra2 := 0
   if buf.get_8() == 1:
-    buf.get_32()
+    buf.get_32() # extra1
     extra2 = buf.get_32()
     
   if creature_dead_id < 0:
-    print('ITEM_OR_CORPSE item item_id: ', item_id, ', model: ', model,
-      ', name: ', name, ', hover_text: ', hover_text, 
-      ', material_id: ', material_id, ', x: ', x, ', y: ', y, ', h: ', h,
-      ', rot: ', rot, ', layer: ', layer, ', description: ', description,
-      ', icon_id: ', icon_id, ', scale: ', scale, ', bridge_id: ', bridge_id,
-      ', rarity: ', rarity, ', placeable: ', placeable, ', parent: ', parent,
-      ', extra2: ', extra2)
+    Logger.debug_extreme('ITEM_OR_CORPSE item item_id: ' + str(item_id) + ', model: ' + model + ', name: ' + name +
+      ', hover_text: ' + hover_text + ', material_id: ' + str(material_id) + ', x: ' + str(x) + ', y: ' + str(y) +
+      ', h: ' + str(h) + ', rot: ' + str(rot) + ', layer: ' + str(layer) + ', description: ' + description +
+      ', icon_id: ' + str(icon_id) + ', scale: ' + str(scale) + ', bridge_id: ' + str(bridge_id) +
+      ', rarity: ' + str(rarity) + ', placeable: ' + str(placeable) + ', parent: ' + str(parent) +
+      ', extra2: ' + str(extra2))
   else:
-    print('ITEM_OR_CORPSE corpse creature_id: ', creature_dead_id,
-      ', item_id: ', item_id, ', model: ', model, ', name: ', name,
-      ', hover_text: ', hover_text, ', material_id: ', material_id,
-      ', x: ', x, ', y: ', y, ', h: ', h, ', rot: ', rot, ', layer: ', layer,
-      ', description: ', description, ', icon_id: ', icon_id,
-      ', scale: ', scale, ', extra2: ', extra2)
+    Logger.debug_extreme('ITEM_OR_CORPSE corpse creature_id: ' + str(creature_dead_id) + 'item_id: ' + str(item_id) +
+      ', model: ' + model + ', name: ' + name + ', hover_text: ' + hover_text + ', material_id: ' + str(material_id) +
+      ', x: ' + str(x) + ', y: ' + str(y) + ', h: ' + str(h) + ', rot: ' + str(rot) + ', layer: ' + str(layer) +
+      ', description: ' + description + ', icon_id: ' + str(icon_id) + ', scale: ' + str(scale) +
+      ', bridge_id: ' + str(bridge_id) + ', rarity: ' + str(rarity) + ', placeable: ' + str(placeable) +
+      ', parent: ' + str(parent) + ', extra2: ' + str(extra2))
 
-func _recv_add_item(buf: StreamPeerBuffer):
+func _recv_add_item(buf: ExtendedStreamPeerBuffer):
   _receive_item_or_corpse(-10, buf)
 
-func _recv_add_fence(buf: StreamPeerBuffer):
+func _recv_add_fence(buf: ExtendedStreamPeerBuffer):
   var x := buf.get_16()
   var y := buf.get_16()
   var dir := buf.get_8()
@@ -913,37 +868,36 @@ func _recv_add_fence(buf: StreamPeerBuffer):
   var a := 0.0
   var has_colours := buf.get_8() != 0
   if has_colours:
-    r = OverflowService.as_u8(buf.get_8()) / 255.0
-    g = OverflowService.as_u8(buf.get_8()) / 255.0
-    b = OverflowService.as_u8(buf.get_8()) / 255.0
+    r = buf.get_u8() / 255.0
+    g = buf.get_u8() / 255.0
+    b = buf.get_u8() / 255.0
     a = 1.0
   
-  var height_offset := OverflowService.as_u16(buf.get_16())
+  var height_offset := buf.get_u16()
   var layer := buf.get_8()
   var name := ''
   if buf.get_available_bytes() > 0:
-    name = _get_string(buf)
+    name = buf.get_string_8()
   
-  print('ADD_FENCE x: ', x, ', y: ', y, ', dir: ', dir, ', type: ', type,
-    ', is_complete: ', is_complete, ', r: ', r, ', g: ', g, ', b: ', b,
-    ', a: ', a, ', height_offset: ', height_offset, ', layer: ', layer,
-    ', name: ', name)
+  Logger.debug_extreme('ADD_FENCE x: ' + str(x) + ', y: ' + str(y) + ', dir: ' + str(dir) + ', type: ' + str(type) +
+    ', is_complete: ' + str(is_complete) + ', r: ' + str(r) + ', g: ' + str(g) + ', b: ' + str(b) + ', a: ' + str(a) +
+    ', height_offset: ' + str(height_offset) + ', layer: ' + str(layer) + ', name: ' + name)
 
-func _recv_add_structure(buf: StreamPeerBuffer):
+func _recv_add_structure(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
   var type := buf.get_8()
-  var name := _get_string(buf)
+  var name := buf.get_string_8()
   var x_center := buf.get_16()
   var y_center := buf.get_16()
   var layer := buf.get_8()
   if type == 0:
-    print('ADD_STRUCTURE house id: ', id, ', name: ', name,
-      ', x_center: ', x_center, ', y_center: ', y_center, ', layer: ', layer)
+    Logger.debug_extreme('ADD_STRUCTURE house id: ' + str(id) + ', name: ' + name + ', x_center: ' + str(x_center) +
+      ', y_center: ' + str(y_center) + ', layer: ' + str(layer))
   else:
-    print('ADD_STRUCTURE bridge id: ', id, ', name: ', name,
-      ', x_center: ', x_center, ', y_center: ', y_center, ', layer: ', layer)
+    Logger.debug_extreme('ADD_STRUCTURE bridge id: ' + str(id) + ', name: ' + name + ', x_center: ' + str(x_center) +
+      ', y_center: ' + str(y_center) + ', layer: ' + str(layer))
 
-func _recv_build_mark(buf: StreamPeerBuffer):
+func _recv_build_mark(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
   var layer := buf.get_8()
   var count := buf.get_8()
@@ -952,43 +906,42 @@ func _recv_build_mark(buf: StreamPeerBuffer):
     var x := buf.get_16()
     var y := buf.get_16()
     
-    print('BUILD_MARK id: ', id, ', layer: ', layer, ', x: ', x, ', y: ', y)
+    Logger.debug_extreme('BUILD_MARK id: ' + str(id) + ', layer: ' + str(layer) + ', x: ' + str(x) + ', y: ' + str(y))
 
-func _recv_add_wall(buf: StreamPeerBuffer):
+func _recv_add_wall(buf: ExtendedStreamPeerBuffer):
   var house_id := buf.get_64()
-  var y := OverflowService.as_u16(buf.get_16())
-  var x := OverflowService.as_u16(buf.get_16())
+  var y := buf.get_u16()
+  var x := buf.get_u16()
   var dir := buf.get_8()
   var type := buf.get_8()
-  var material := _get_string(buf)
+  var material := buf.get_string_8()
   var r := 1.0
   var g := 1.0
   var b := 1.0
   var a := 0.0
   var has_colours := buf.get_8() != 0
   if has_colours:
-    r = OverflowService.as_u8(buf.get_8()) / 255.0
-    g = OverflowService.as_u8(buf.get_8()) / 255.0
-    b = OverflowService.as_u8(buf.get_8()) / 255.0
+    r = buf.get_u8() / 255.0
+    g = buf.get_u8() / 255.0
+    b = buf.get_u8() / 255.0
     a = 1.0
   
-  var height_offset := OverflowService.as_u16(buf.get_16())
+  var height_offset := buf.get_u16()
   var layer := buf.get_8()
   var override_reverse := buf.get_8() != 0
   var name := ''
   if buf.get_available_bytes() > 0:
-    name = _get_string(buf)
+    name = buf.get_string_8()
   
-  print('ADD_WALL house_id: ', house_id, ', x: ', x, ', y: ', y, ', dir: ', dir,
-    ', type: ', type, ', material: ', material, ', r: ', r, ', g: ', g,
-    ', b: ', b, ', a: ', a, ', height_offset: ', height_offset,
-    ', layer: ', layer, ', override_reverse: ', override_reverse, 
-    ', name: ', name)
+  Logger.debug_extreme('ADD_WALL house_id: ' + str(house_id) + ' x: ' + str(x) + ', y: ' + str(y) +
+    ', dir: ' + str(dir) + ', type: ' + str(type) + ', material: ' + str(material) + ', r: ' + str(r) +
+    ', g: ' + str(g) + ', b: ' + str(b) + ', a: ' + str(a) + ', height_offset: ' + str(height_offset) +
+    ', layer: ' + str(layer) + ', override_reverse: ' + str(override_reverse) + ', name: ' + name)
 
-func _recv_add_floor(buf: StreamPeerBuffer):
+func _recv_add_floor(buf: ExtendedStreamPeerBuffer):
   var house_id := buf.get_64()
-  var x := OverflowService.as_u16(buf.get_16())
-  var y := OverflowService.as_u16(buf.get_16())
+  var x := buf.get_u16()
+  var y := buf.get_u16()
   var height_offset := buf.get_16()
   var type := buf.get_8()
   var material := buf.get_8()
@@ -997,49 +950,48 @@ func _recv_add_floor(buf: StreamPeerBuffer):
   var dir := buf.get_8()
   
   if type == 4:
-    print('ADD_FLOOR roof house_id: ', house_id, ', x: ', x, ', y: ', y,
-      ', height_offset: ', height_offset, ', type: ', type, 
-      ', material: ', material, ', state: ', state, ', layer: ', layer)
+    Logger.debug_extreme('ADD_FLOOR roof house_id: ' + str(house_id) + ', x: ' + str(x) + ', y: ' + str(y) +
+      ', height_offset: ' + str(height_offset) + ', type: ' + str(type) + ', material: ' + str(material) +
+      ', state: ' + str(state) + ', layer: ' + str(layer))
   else:
-    print('ADD_FLOOR floor house_id: ', house_id, ', x: ', x, ', y: ', y,
-      ', height_offset: ', height_offset, ', type: ', type, 
-      ', material: ', material, ', state: ', state, ', layer: ', layer,
-      ', dir: ', dir)
+    Logger.debug_extreme('ADD_FLOOR floor house_id: ' + str(house_id) + ', x: ' + str(x) + ', y: ' + str(y) +
+      ', height_offset: ' + str(height_offset) + ', type: ' + str(type) + ', material: ' + str(material) +
+      ', state: ' + str(state) + ', layer: ' + str(layer) + ', dir: ' + str(dir))
 
-func _recv_repaint(buf: StreamPeerBuffer):
+func _recv_repaint(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
-  var r := OverflowService.as_u8(buf.get_8()) / 255.0
-  var g := OverflowService.as_u8(buf.get_8()) / 255.0
-  var b := OverflowService.as_u8(buf.get_8()) / 255.0
-  var a := OverflowService.as_u8(buf.get_8()) / 255.0
-  var paint_type := OverflowService.as_u8(buf.get_8())
+  var r := buf.get_u8() / 255.0
+  var g := buf.get_u8() / 255.0
+  var b := buf.get_u8() / 255.0
+  var a := buf.get_u8() / 255.0
+  var paint_type := buf.get_u8()
   
-  print('REPAINT id: ', id, ', r: ', r, ', g: ', g, ', b: ', b, ', a: ', a,
-    ', paint_type: ', paint_type)
+  Logger.debug_extreme('REPAINT id: ' + str(id) + ', r: ' + str(r) + ', g: ' + str(g) + ', b: ' + str(b) +
+    ', a: ' + str(a) + ', paint_type: ' + str(paint_type))
 
 func _recv_start_moving():
-  print('START_MOVING')
+  Logger.debug_extreme('START_MOVING')
 
-func _recv_move_creature(buf: StreamPeerBuffer):
+func _recv_move_creature(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
   var y := buf.get_float()
   var x := buf.get_float()
   var rot_diff := buf.get_8()
   
-  print('MOVE_CREATURE id: ', id, ', x: ', x, ', y: ', y,
-    ', rot_diff: ', rot_diff)
+  Logger.debug_extreme('MOVE_CREATURE id: ' + str(id) + ', x: ' + str(x) + ', y: ' + str(y) +
+    ', rot_diff: ' + str(rot_diff))
 
-func _recv_move_creature_and_set_z(buf: StreamPeerBuffer):
+func _recv_move_creature_and_set_z(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
   var h := buf.get_float()
   var x := buf.get_float()
   var rot_diff := buf.get_8()
   var y := buf.get_float()
   
-  print('MOVE_CREATURE_AND_SET_Z id: ', id, ', x: ', x, ', y: ', y, ', h: ', h,
-    ', rot_diff: ', rot_diff)
+  Logger.debug_extreme('MOVE_CREATURE_AND_SET_Z id: ' + str(id) + ', x: ' + str(x) + ', y: ' + str(y) +
+    ', h: ' + str(h) + ', rot_diff: ' + str(rot_diff))
 
-func _recv_tilestrip_far(buf: StreamPeerBuffer):
+func _recv_tilestrip_far(buf: ExtendedStreamPeerBuffer):
   var x_start := buf.get_16()
   var y_start := buf.get_16()
   var width := buf.get_16()
@@ -1064,19 +1016,18 @@ func _recv_tilestrip_far(buf: StreamPeerBuffer):
 #    ', width: ', width, ', height: ', height, ', tiles: ', tiles,
 #    ', types: ', types)
 
-func _recv_server_time(buf: StreamPeerBuffer):
+func _recv_server_time(buf: ExtendedStreamPeerBuffer):
   var server_time_ms := buf.get_64()
   var wurm_time_s := buf.get_64()
   
-  print('SERVER_TIME server_time_ms: ', server_time_ms,
-    ', wurm_time_s: ', wurm_time_s)
+  Logger.debug_extreme('SERVER_TIME server_time_ms: ' + str(server_time_ms) + ', wurm_time_s: ' + str(wurm_time_s))
 
 func _handle_recv(bytes: PoolByteArray):
-  var buf := StreamPeerBuffer.new()
+  var buf := ExtendedStreamPeerBuffer.new()
   buf.big_endian = true
   buf.data_array = bytes
   
-  match OverflowService.as_8(buf.get_8()):
+  match buf.get_u8():
     -52: _recv_steam_auth(buf)
     -50: pass # VALREI MAP
     -47: _recv_status_effect_bar(buf)
@@ -1135,7 +1086,7 @@ func _handle_recv(bytes: PoolByteArray):
     112: _recv_add_structure(buf)
     124: _recv_set_skill(buf)
     var code:
-      print('UNHANDLED RECV CODE: ', code)
+      Logger.warn('UNHANDLED RECV CODE: ' + str(code))
   
   if _new_seed_pointer == 32:
     encryption_service.decrypt_random = Random.new(_new_seed)
@@ -1151,7 +1102,7 @@ func _process(delta):
   
   var byte_count := stream_peer.get_available_bytes()
   while byte_count > 0:
-    var len_buf := StreamPeerBuffer.new()
+    var len_buf := ExtendedStreamPeerBuffer.new()
     len_buf.big_endian = true
     len_buf.data_array = stream_peer.get_data(2)[1]
     len_buf.data_array = encryption_service.decrypt(len_buf.data_array)

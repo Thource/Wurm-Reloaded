@@ -21,11 +21,6 @@ var _import_thread := Thread.new()
 var _import_status := ImportStatus.new()
 
 func _ready():
-#  var bml_node := BMLParser.parse("border{center{text{type='bold';text=\"Please select gender:\"}};null;scroll{vertical=\"true\";horizontal=\"false\";varray{rescale=\"true\";passthrough{id=\"id\";text=\"38\"}text{text=\"\"}text{text=\"\"}radio{ group='male'; id='false';text='Female';selected='true'}radio{ group='male'; id='true';text='Male';selected='false'}text{text=\"\"}text{text=\"\"}text{text=\"Please select kingdom.\"}text{text=\"\"}harray{label{text='Kingdom: '};dropdown{id='kingdomid';options=\"Jenn-Kellon,Mol Rehan,Horde of the Summoned,,None\"}}harray {button{text='Send';id='submit'}}}};null;null;}")
-#  bml_node.window_title = 'Define your character'
-#  add_child(bml_node)
-#  var vp_size := get_viewport().size
-#  bml_node.popup(Rect2((vp_size.x * 0.5) - (300 / 2), (vp_size.y * 0.5) - (300 / 2), 300, 300))
   pass
 
 func _process(delta: float):
@@ -162,6 +157,7 @@ func _import(path: String):
     for file_path in jar_files_by_extensions[jar_ind].get('wom', []):
       var dir_path: String = file_path.substr(0, file_path.find_last('/'))
       if file_path.substr(file_path.find_last('/') + 1, file_path.length()) != 'Spider_main.wom': continue
+#      if !file_path.begins_with('creatures/'): continue
       
       Directory.new().make_dir_recursive('user://content/models/' + dir_path)
 

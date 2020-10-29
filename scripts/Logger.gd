@@ -16,6 +16,14 @@ static func _log(text: String):
 static func info(text: String):
   _log('[INFO] ' + text)
 
+static func warn(text: String):
+  _log('[WARN] ' + text)
+
+static func error(text: String):
+  _log('[ERROR] ' + text)
+
 static func debug(text: String, debug_level := DebugLevel.BASIC):
-  _log('[DEBUG] ' + text)
-  pass
+  _log('[DEBUG] [' + DebugLevel.keys()[debug_level] + '] ' + text)
+
+static func debug_extreme(text: String):
+  debug(text, DebugLevel.EXTREME)
