@@ -28,9 +28,8 @@ class_name WOMLoader
 #  wolf/Wolf_main_bp - very squished
 
 static func _search_recursively(path: String, file_name: String):
-  var dir := Directory.new()
-  dir.open(path)
-  dir.list_dir_begin(true)
+  var dir := DirAccess.open(path)
+  dir.list_dir_begin() # TODOConverter3To4 fill missing arguments https://github.com/godotengine/godot/pull/40547
 
   while true:
     var fn = dir.get_next()
@@ -86,8 +85,8 @@ class WOMModelData:
   var joint_datas := [] # WOMJointData[]
 
 static func _load_model_data(gd_unzip, model_path: String) -> WOMModelData:
-  var dir_path := model_path.substr(0, model_path.find_last('/'))
-  var model_name := model_path.substr(model_path.find_last('/') + 1, model_path.length())
+  var dir_path := model_path.substr(0, model_path.rfind('/'))
+  var model_name := model_path.substr(model_path.rfind('/') + 1, model_path.length())
   var wom_model_data := WOMModelData.new()
   
   var buf := ExtendedStreamPeerBuffer.new()
@@ -193,16 +192,16 @@ static func _load_model_data(gd_unzip, model_path: String) -> WOMModelData:
   return wom_model_data
 
 static func _load_model(gd_unzip, model_path: String) -> WOMModel:
-  var dir_path := model_path.substr(0, model_path.find_last('/'))
-  var model_name := model_path.substr(model_path.find_last('/') + 1, model_path.length())
+  var dir_path := model_path.substr(0, model_path.rfind('/'))
+  var model_name := model_path.substr(model_path.rfind('/') + 1, model_path.length())
   var wom_model_data := _load_model_data(gd_unzip, model_path)
   var wom_model := WOMModel.new()
   wom_model.name = 'WOMModel'
   
-  var skeleton: Skeleton
+  var skeleton: Skeleton3D
   if wom_model_data.joint_datas.size() > 0:
-    skeleton = Skeleton.new()
-    skeleton.name = 'Skeleton'
+    skeleton = Skeleton3D.new()
+    skeleton.name = 'Skeleton3D'
     wom_model.add_child(skeleton)
     skeleton.set_owner(wom_model)
     
@@ -218,13 +217,13 @@ static func _load_model(gd_unzip, model_path: String) -> WOMModel:
   
   for mesh_data in wom_model_data.mesh_datas:
 #    print('mesh: ', mesh_data.name)
-    var mesh_instance := MeshInstance.new()
+    var mesh_instance := MeshInstance3D.new()
     mesh_instance.name = mesh_data.name
     wom_model.add_child(mesh_instance)
     mesh_instance.set_owner(wom_model)
     mesh_instance.hide()
     if skeleton != null && mesh_data.skin_datas.size() > 0:
-      mesh_instance.skeleton = NodePath('../Skeleton')
+      mesh_instance.skeleton = NodePath('../Skeleton3D')
     
     var vertex_bones := [] # int[4][]
     vertex_bones.resize(mesh_data.vertices.size())
@@ -260,12 +259,12 @@ static func _load_model(gd_unzip, model_path: String) -> WOMModel:
       if vertex_bones[vertex_ind] != null:
 #        print('bones: ', vertex_bones[vertex_ind])
 #        print('weights: ', vertex_weights[vertex_ind])
-        surface_tool.add_bones(vertex_bones[vertex_ind])
-        surface_tool.add_weights(vertex_weights[vertex_ind])
-      surface_tool.add_normal(mesh_data.normals[vertex_ind])
-      surface_tool.add_uv(mesh_data.uvs[vertex_ind])
+        surface_tool.set_bones(vertex_bones[vertex_ind])
+        surface_tool.set_weights(vertex_weights[vertex_ind])
+      surface_tool.set_normal(mesh_data.normals[vertex_ind])
+      surface_tool.set_uv(mesh_data.uvs[vertex_ind])
       if has_vertex_colors:
-        surface_tool.add_color(mesh_data.vertex_colors[vertex_ind])
+        surface_tool.set_color(mesh_data.vertex_colors[vertex_ind])
       surface_tool.add_vertex(mesh_data.vertices[vertex_ind])
       
       
@@ -292,24 +291,23 @@ static func _load_model(gd_unzip, model_path: String) -> WOMModel:
       
 
     # Material data
-    var dir := Directory.new()
     for material_ind in range(mesh_data.material_datas.size()):
       var material_data: WOMMaterialData = mesh_data.material_datas[material_ind]
       var texture_name := material_data.texture_name
       var material_name := material_data.name
     
-      var material := SpatialMaterial.new()
+      var material := StandardMaterial3D.new()
       if texture_name != '':
         var texture_path := 'user://content/textures/' + dir_path + '/' + texture_name
-        if !dir.file_exists(texture_path):
+        if !FileAccess.file_exists(texture_path):
           # print(texture_path + ' does not exist, searching recursively')
           texture_path = _search_recursively('user://content/textures', texture_name)
         
-        if !dir.file_exists(texture_path):
+        if !FileAccess.file_exists(texture_path):
           # print(texture_path + ' does not exist, after searching recursively')
           continue
         
-        material.set_texture(SpatialMaterial.TEXTURE_ALBEDO, load(texture_path))
+        material.set_texture(StandardMaterial3D.TEXTURE_ALBEDO, load(texture_path))
     
       if material_data.emission:
         material.emission_enabled = true
@@ -319,11 +317,11 @@ static func _load_model(gd_unzip, model_path: String) -> WOMModel:
         material.metallic = material_data.specular.r
       if material_data.transparency_color:
         material.flags_transparent = true
-        material.params_depth_draw_mode = SpatialMaterial.DEPTH_DRAW_ALPHA_OPAQUE_PREPASS
+        material.params_depth_draw_mode = StandardMaterial3D.DEPTH_DRAW_ALWAYS
       mesh_instance.mesh.surface_set_material(material_ind, material)
   
   var properties_unc = gd_unzip.uncompress(dir_path + '/properties.xml')
-  var properties_xml = properties_unc if properties_unc else PoolByteArray()
+  var properties_xml = properties_unc if properties_unc else PackedByteArray()
   if properties_xml.size() > 0:
     var properties := {}
     
@@ -340,15 +338,15 @@ static func _load_model(gd_unzip, model_path: String) -> WOMModel:
         current_key += xml_parser.get_node_name()
         
       if node_type == XMLParser.NODE_ELEMENT_END || (node_type == XMLParser.NODE_ELEMENT && xml_parser.is_empty()):
-        current_key = current_key.substr(0, current_key.find_last('>'))
+        current_key = current_key.substr(0, current_key.rfind('>'))
 
       if node_type == XMLParser.NODE_TEXT && current_key.begins_with('properties>' + model_name + '>'):
         var node_data := xml_parser.get_node_data().strip_edges()
         if node_data != '':
           var key_dict := properties
           var attr_key := current_key.replace('properties>' + model_name + '>', '')
-          attr_key = attr_key.substr(0, attr_key.find_last('>'))
-          var set_key := current_key.substr(current_key.find_last('>') + 1, current_key.length())
+          attr_key = attr_key.substr(0, attr_key.rfind('>'))
+          var set_key := current_key.substr(current_key.rfind('>') + 1, current_key.length())
           for key in attr_key.split('>'):
             if !key_dict.has(key):
               key_dict[key] = {}
@@ -369,17 +367,21 @@ static func _load_model(gd_unzip, model_path: String) -> WOMModel:
       animation_player.set_owner(wom_model)
       animation_player.name = 'AnimationPlayer'
       
+      var animation_library := AnimationLibrary.new()
+      
       var model_anims: Dictionary = properties['anim']
       for anim_key in model_anims.keys():
         
         var anim := _load_anim(gd_unzip, dir_path + '/' + model_anims[anim_key]['file'], wom_model_data)
-        animation_player.add_animation(anim_key, anim)
+        animation_library.add_animation(anim_key, anim)
+      
+      animation_player.add_animation_library('anims', animation_library)
   
   return wom_model
 
 static func _load_anim(gd_unzip, anim_path: String, wom_model_data: WOMModelData) -> Animation:
-  var dir_path := anim_path.substr(0, anim_path.find_last('/'))
-  var anim_file_name := anim_path.substr(anim_path.find_last('/') + 1, anim_path.length())
+  var dir_path := anim_path.substr(0, anim_path.rfind('/'))
+  var anim_file_name := anim_path.substr(anim_path.rfind('/') + 1, anim_path.length())
   var animation := Animation.new()
   
   # print('anim ', anim_name, anim_path)
@@ -391,8 +393,8 @@ static func _load_anim(gd_unzip, anim_path: String, wom_model_data: WOMModelData
   var joint_count := buf.get_32()
   for j in range(joint_count):
     var joint_name := buf.get_string()
-    var track_ind := animation.add_track(Animation.TYPE_TRANSFORM)
-    animation.track_set_path(track_ind, NodePath('Skeleton:' + joint_name))
+    var track_ind := animation.add_track(Animation.TYPE_POSITION_3D)
+    animation.track_set_path(track_ind, NodePath('Skeleton3D:' + joint_name))
     var keyframe_count := buf.get_32()
     
 #    print(anim_name)
@@ -428,25 +430,26 @@ static func _load_anim(gd_unzip, anim_path: String, wom_model_data: WOMModelData
         animation_matrix = first_matrix
       
 #      print('animation_matrix: ', animation_matrix.get_position(), ' ', animation_matrix.get_scale(), ' ', animation_matrix.get_quaternion().get_euler())
+      animation.position_track_insert_key(track_ind, time, animation_matrix.get_position() - joint_data.bind_offset.get_position())
       
-      animation.transform_track_insert_key(track_ind, time, 
-#        (animation_matrix.get_position() * joint_data.bind_matrix.get_scale()) - (joint_data.bind_matrix.get_position() * joint_data.bind_matrix.get_scale()),
-#        Quat(animation_matrix.get_quaternion().get_euler() - joint_data.bind_matrix.get_quaternion().get_euler()),
-        (animation_matrix.get_position() * animation_matrix.get_scale()) - (joint_data.bind_offset.get_position() * joint_data.bind_offset.get_scale()),
-        animation_matrix.get_quaternion(),
-#        animation_matrix.get_position() - joint_data.bind_matrix.get_position(), 
-#        Quat(animation_matrix.get_quaternion().get_euler() - joint_data.bind_matrix.get_quaternion().get_euler()),
-        Vector3.ONE
-      )
+#      animation.transform_track_insert_key(track_ind, time, 
+##        (animation_matrix.get_position() * joint_data.bind_matrix.get_scale()) - (joint_data.bind_matrix.get_position() * joint_data.bind_matrix.get_scale()),
+##        Quat(animation_matrix.get_quaternion().get_euler() - joint_data.bind_matrix.get_quaternion().get_euler()),
+#        (animation_matrix.get_position() * animation_matrix.get_scale()) - (joint_data.bind_offset.get_position() * joint_data.bind_offset.get_scale()),
+#        animation_matrix.get_quaternion(),
+##        animation_matrix.get_position() - joint_data.bind_matrix.get_position(), 
+##        Quat(animation_matrix.get_quaternion().get_euler() - joint_data.bind_matrix.get_quaternion().get_euler()),
+#        Vector3.ONE
+#      )
   
   animation.length = length
   return animation
   
 
 static func load_wom(gd_unzip, model_path: String):
-  var dir_path := model_path.substr(0, model_path.find_last('/'))
+  var dir_path := model_path.substr(0, model_path.rfind('/'))
   
-  if dir_path.substr(dir_path.find_last('/') + 1, dir_path.length()) == 'anim':
+  if dir_path.substr(dir_path.rfind('/') + 1, dir_path.length()) == 'anim':
     return false
   else:
     return _load_model(gd_unzip, model_path)

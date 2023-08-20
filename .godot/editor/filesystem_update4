@@ -1,0 +1,14 @@
+res://default_env.tres
+res://scenes/World.tscn
+res://scripts/ConnectionHandler.gd
+res://scripts/Logger.gd
+res://scripts/EncryptionService.gd
+res://scripts/BMLParser.gd
+res://scripts/BML.gd
+res://scripts/Play.gd
+res://scripts/ResourceResolver.gd
+res://scripts/Creature.gd
+res://scripts/WurmWorld.gd
+res://scripts/WOMModel.gd
+res://scripts/Tile.gd
+res://scripts/Player.gd

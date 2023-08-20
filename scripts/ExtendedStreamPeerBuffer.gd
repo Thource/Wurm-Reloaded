@@ -31,8 +31,8 @@ func get_string_16() -> String:
 
 func put_string_8(string: String):
   put_u8(string.length())
-  put_data(string.to_utf8())
+  put_data(string.to_utf8_buffer())
 
 func put_string_16(string: String):
   put_u16(string.length())
-  put_data(string.to_utf8())
+  put_data(string.to_utf8_buffer())

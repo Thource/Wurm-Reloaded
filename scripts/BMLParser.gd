@@ -1,7 +1,7 @@
 class_name BMLParser
 
 const SPECIAL_CHARS := "{}=;\"'"
-const _current_form_button_groups := {}
+static var _current_form_button_groups := {}
 
 static func parse(input: String) -> BML:
   var st := StringTokenizer.new(input, SPECIAL_CHARS, true)
@@ -91,7 +91,7 @@ static func parse_node(type: String, st: StringTokenizer) -> Node:
   
   return current_node
 
-static func set_attr(node, key: String, value: String) -> void:
+static func set_attr(node: Node, key: String, value: String) -> void:
   match key:
     'text':
       if node is Label || node is BMLButton || node is BMLRadio:
@@ -108,21 +108,24 @@ static func set_attr(node, key: String, value: String) -> void:
           bg.resource_name = value
           _current_form_button_groups[value] = bg
         
-        node.group = _current_form_button_groups.get(value)
+        node.button_group = _current_form_button_groups.get(value)
     'selected':
       if node is BMLRadio:
-        node.pressed = value == 'true'
+        node.button_pressed = value == 'true'
     'options':
       if node is BMLDropdown:
         for option in value.split(','):
           node.add_item(option)
+    'enabled':
+      if node is BMLButton:
+        node.disabled = value == 'false'
 
 static func make_node(type: String) -> Node:
   match type:
     'border':
       var node := Control.new()
-      node.rect_clip_content = true
-      node.set_anchors_and_margins_preset(Control.PRESET_WIDE)
+      node.clip_contents = true
+      node.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
       return node
     'center':
       var node := CenterContainer.new()
@@ -132,16 +135,16 @@ static func make_node(type: String) -> Node:
       return node
     'scroll':
       var node := ScrollContainer.new()
-      node.scroll_vertical_enabled = false
-      node.scroll_horizontal_enabled = false
+      node.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+      node.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
       return node
     'varray':
       var node := VBoxContainer.new()
-      node.set_anchors_and_margins_preset(Control.PRESET_WIDE)
+      node.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
       return node
     'harray':
       var node := HBoxContainer.new()
-      node.set_anchors_and_margins_preset(Control.PRESET_WIDE)
+      node.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
       return node
     'label':
       var node := Label.new()

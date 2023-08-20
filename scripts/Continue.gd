@@ -11,23 +11,22 @@ func _ready():
   pass # Replace with function body.
 
 func _pressed():
-  var path: String = $"../../HBoxContainer/Path".text + '/WurmLauncher/packs'
+  var path: String = $"../../HBoxContainer/Path3D".text + '/WurmLauncher/packs'
   print(path)
-  var directory := Directory.new()
   
-  if !directory.dir_exists(path):
+  if !DirAccess.dir_exists_absolute(path):
     print("invalid wurm directory")
     return
   
-  if !directory.file_exists(path + '/graphics.jar'):
+  if !FileAccess.file_exists(path + '/graphics.jar'):
     print("missing graphics.jar")
     return
   
-  if !directory.file_exists(path + '/pmk.jar'):
+  if !FileAccess.file_exists(path + '/pmk.jar'):
     print("missing pmk.jar")
     return
   
-  if !directory.file_exists(path + '/sound.jar'):
+  if !FileAccess.file_exists(path + '/sound.jar'):
     print("missing sound.jar")
     return
     

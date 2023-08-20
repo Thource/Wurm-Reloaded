@@ -1,13 +1,13 @@
 class_name BML
 
-extends WindowDialog
+extends Window
 
 signal button_pressed
 
 func _init():
-  popup_exclusive = true
-  resizable = true
-  rect_min_size = Vector2(0, 40)
+  exclusive = true
+  unresizable = false
+  min_size = Vector2(0, 40)
 
 func _get_all_children(node: Node) -> Array:
   var children := []
@@ -24,7 +24,7 @@ func _get_values() -> Dictionary:
   for child in _get_all_children(self):
     if child is BMLRadio:
       if child.pressed:
-        values[child.group.resource_name] = child.id
+        values[child.button_group.resource_name] = child.id
     elif child is BMLDropdown || child is BMLPassThrough:
       values[child.id] = child.text
   

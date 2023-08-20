@@ -27,7 +27,7 @@ func _set_max_delim_code_point() -> void:
   var m := 0
   var c: int
   for i in range(_delimiters.length()):
-    c = ord(_delimiters[i])
+    c = _delimiters[i].unicode_at(0)
     if m < c: m = c
   
   _max_delim_code_point = m
@@ -38,7 +38,7 @@ func _skip_delimiters(start_pos: int) -> int:
   var position := start_pos
   while !_ret_delims && position < _max_position:
     var c := _str[position]
-    var cc := ord(c)
+    var cc := c.unicode_at(0)
     if cc > _max_delim_code_point || _delimiters.find(c) < 0: break
     
     position += 1
@@ -50,14 +50,14 @@ func _scan_token(start_pos: int) -> int:
   
   while position < _max_position:
     var c := _str[position]
-    var cc := ord(c)
+    var cc := c.unicode_at(0)
     if cc <= _max_delim_code_point && _delimiters.find(c) >= 0: break
     
     position += 1
   
   if _ret_delims && start_pos == position:
     var c := _str[position]
-    var cc := ord(c)
+    var cc := c.unicode_at(0)
     if cc <= _max_delim_code_point && _delimiters.find(c) >= 0: position += 1
   
   return position

@@ -6,16 +6,17 @@ class ImportStatus:
   var max_progress := 0
   
   func set_stage(_stage: String, _max_progress: int):
+    print('Stage = ' + _stage + ' (' + str(_max_progress) + ')')
     self.stage = _stage
     self.max_progress = _max_progress
     self.progress = 1
 
-export var import_stage_label_path: NodePath
-onready var import_stage_label: Label = get_node(import_stage_label_path)
-export var import_progress_bar_path: NodePath
-onready var import_progress_bar: ProgressBar = get_node(import_progress_bar_path)
-export var import_progress_bar_label_path: NodePath
-onready var import_progress_bar_label: Label = get_node(import_progress_bar_label_path)
+@export var import_stage_label_path: NodePath
+@onready var import_stage_label: Label = get_node(import_stage_label_path)
+@export var import_progress_bar_path: NodePath
+@onready var import_progress_bar: ProgressBar = get_node(import_progress_bar_path)
+@export var import_progress_bar_label_path: NodePath
+@onready var import_progress_bar_label: Label = get_node(import_progress_bar_label_path)
 
 var _import_thread := Thread.new()
 var _import_status := ImportStatus.new()
@@ -24,27 +25,44 @@ func _ready():
   pass
 
 class LoadedResource:
-  var spatial: Spatial
+  var spatial: Node3D
   var direction: Vector3
-var _loaded_resources := []
+  var angular_velocity := Vector3.ZERO
+var _loaded_resources: Array[LoadedResource] = []
 
 func _fling_texture(image_texture: ImageTexture):
+  return
+  
   var loaded_resource := LoadedResource.new()
-  var spatial := Spatial.new()
-  var mi := MeshInstance.new()
+  var spatial := Node3D.new()
+  var mi := MeshInstance3D.new()
   mi.mesh = QuadMesh.new()
-  var mat := SpatialMaterial.new()
+  var mat := StandardMaterial3D.new()
   mat.albedo_texture = image_texture
   mi.mesh.surface_set_material(0, mat)
   spatial.add_child(mi)
   add_child(spatial)
   loaded_resource.spatial = spatial
-  loaded_resource.direction = Vector3(rand_range(-4.0, 4.0), rand_range(-4.0, 4.0), 0).normalized()
+  loaded_resource.direction = Vector3(randf_range(-4.0, 4.0), randf_range(-4.0, 4.0), 0).normalized()
+  _loaded_resources.push_back(loaded_resource)
+
+func _fling_model(model_scene: PackedScene):
+  return
+  
+  var loaded_resource := LoadedResource.new()
+  var spatial = model_scene.instantiate()
+  add_child(spatial)
+  loaded_resource.spatial = spatial
+  loaded_resource.direction = Vector3(randf_range(-4.0, 4.0), randf_range(-4.0, 4.0), 0).normalized()
+  loaded_resource.angular_velocity = Vector3(randf_range(-4.0, 4.0), randf_range(-4.0, 4.0), randf_range(-4.0, 4.0)).normalized()
   _loaded_resources.push_back(loaded_resource)
 
 func _process(delta: float):
   for lr in _loaded_resources:
-    lr.spatial.translation += lr.direction * delta * 4.0
+    lr.spatial.position += lr.direction * delta * 2.0
+    
+    if lr.angular_velocity != Vector3.ZERO:
+      lr.spatial.rotation_degrees += lr.angular_velocity * delta * 90.0
 
   if _import_status.stage == '': return
   if _import_status.stage == 'Done':
@@ -57,6 +75,18 @@ func _process(delta: float):
   import_progress_bar.set_value(_import_status.progress)
   import_progress_bar.set_max(_import_status.max_progress)
   import_progress_bar_label.set_text(str(_import_status.progress) + ' / ' + str(_import_status.max_progress))
+
+func _save_wom_model(wom_model: WOMModel, path: String):
+  var dir_path: String = path.substr(0, path.rfind('/'))
+  if !path.contains('/'):
+    dir_path = ''
+  
+  DirAccess.make_dir_recursive_absolute('user://content/models/' + dir_path)
+  
+  var scene := PackedScene.new()
+  scene.pack(wom_model)
+  ResourceSaver.save(scene, 'user://content/models/' + path + '.tscn')
+  _fling_model(scene)
 
 func _import(path: String):
   var jars := ['graphics.jar', 'pmk.jar', 'sound.jar']
@@ -134,93 +164,89 @@ func _import(path: String):
 #
 #      _import_status.progress += 1
 
-  _import_status.set_stage('Importing textures', 0)
-  for jar_ind in range(jars.size()):
-    _import_status.max_progress += jar_files_by_extensions[jar_ind].get('dds', []).size()
-
-  for jar_ind in range(jars.size()):
-    var gd_unzip = gd_unzips[jar_ind]
-
-    for file_path in jar_files_by_extensions[jar_ind].get('dds', []):
-      var split_path: PoolStringArray = file_path.split('/')
-      split_path.remove(split_path.size() - 1)
-      Directory.new().make_dir_recursive('user://content/textures/' + split_path.join('/'))
-
-      var image := _convert_dds_to_image(gd_unzip.uncompress(file_path))
-      var image_texture := ImageTexture.new()
-      image_texture.create_from_image(image)
-      ResourceSaver.save('user://content/textures/' + file_path.replace('.dds', '.tres'), image_texture)
-      
-      call_deferred('_fling_texture', image_texture)
-
-      _import_status.progress += 1
+#  _import_status.set_stage('Importing textures', 0)
+#  var texture_count := 0
+#  for jar_ind in range(jars.size()):
+#    texture_count += jar_files_by_extensions[jar_ind].get('dds', []).size()
+#  _import_status.set_stage('Importing textures', texture_count)
+#
+#  for jar_ind in range(jars.size()):
+#    var gd_unzip = gd_unzips[jar_ind]
+#
+#    for file_path in jar_files_by_extensions[jar_ind].get('dds', []):
+#      var split_path: PackedStringArray = file_path.split('/')
+#      split_path.remove_at(split_path.size() - 1)
+#      DirAccess.make_dir_recursive_absolute('user://content/textures/' + '/'.join(split_path))
+#
+#      var image := _convert_dds_to_image(gd_unzip.uncompress(file_path))
+#      var image_texture := ImageTexture.create_from_image(image)
+##      var image_texture := ImageTexture.new()
+#      ResourceSaver.save(image_texture, 'user://content/textures/' + file_path.replace('.dds', '.tres'))
+#
+#      call_deferred('_fling_texture', image_texture)
+#
+#      _import_status.progress += 1
 
   _import_status.set_stage('Importing models', 0)
+  var model_count := 0
   for jar_ind in range(jars.size()):
-    _import_status.max_progress += jar_files_by_extensions[jar_ind].get('wom', []).size()
+    model_count += jar_files_by_extensions[jar_ind].get('wom', []).size()
+  _import_status.set_stage('Importing models', model_count)
 
-  var missing_model_scene := PackedScene.new()
   var missing_model_wom := WOMModel.new()
-  var missing_model_mi := MeshInstance.new()
+  var missing_model_mi := MeshInstance3D.new()
   missing_model_mi.name = 'MissingModelMesh'
   missing_model_wom.model_names.push_back(missing_model_mi.name)
   missing_model_wom.add_child(missing_model_mi)
   missing_model_mi.set_owner(missing_model_wom)
   missing_model_mi.mesh = PrismMesh.new()
   missing_model_mi.mesh.size = Vector3(0.5, 0.5, 0.5)
-  var missing_model_material := SpatialMaterial.new()
+  var missing_model_material := StandardMaterial3D.new()
   missing_model_material.flags_unshaded = true
   missing_model_material.albedo_color = Color(255, 0, 255)
   missing_model_mi.mesh.surface_set_material(0, missing_model_material)
-  missing_model_scene.pack(missing_model_wom)
-  ResourceSaver.save('user://content/models/missing_model.tscn', missing_model_scene)
+  call_deferred('_save_wom_model', missing_model_wom, 'missing_model')
 
   for jar_ind in range(jars.size()):
     var gd_unzip = gd_unzips[jar_ind]
 
     for file_path in jar_files_by_extensions[jar_ind].get('wom', []):
-      var dir_path: String = file_path.substr(0, file_path.find_last('/'))
-      if file_path.substr(file_path.find_last('/') + 1, file_path.length()) != 'Spider_main.wom': continue
+      var dir_path: String = file_path.substr(0, file_path.rfind('/'))
+#      if file_path.substr(file_path.rfind('/') + 1, file_path.length()) != 'Spider_main.wom': continue
 #      if !file_path.begins_with('creatures/'): continue
-      
-      Directory.new().make_dir_recursive('user://content/models/' + dir_path)
 
       var properties_unc = gd_unzip.uncompress(dir_path + '/properties.xml')
-      var properties_xml = properties_unc if properties_unc else PoolByteArray()
+      var properties_xml = properties_unc if properties_unc else PackedByteArray()
       var wom_model = WOMLoader.load_wom(gd_unzip, file_path)
       if !wom_model: continue
-      
-      var wom_scene := PackedScene.new()
-      wom_scene.pack(wom_model)
-      ResourceSaver.save('user://content/models/' + file_path.replace('.wom', '.tscn'), wom_scene)
+
+      call_deferred('_save_wom_model', wom_model, file_path.replace('.wom', ''))
 
       _import_status.progress += 1
 
-  _import_status.set_stage('Importing .txt files', 0)
+  _import_status.set_stage('Importing super.txt files', 0)
   for jar_ind in range(jars.size()):
     _import_status.max_progress += jar_files_by_extensions[jar_ind].get('txt', []).size()
   
   # empty the mapping file
-  var mapping_file := File.new()
-  if mapping_file.open('user://content/resource_map.txt', File.WRITE) != 0:
+  var mapping_file := FileAccess.open('user://content/resource_map.txt', FileAccess.WRITE)
+  if mapping_file != null:
     mapping_file.close()
 
   for jar_ind in range(jars.size()):
     var gd_unzip = gd_unzips[jar_ind]
 
     for file_path in jar_files_by_extensions[jar_ind].get('txt', []):
-      var split_path: PoolStringArray = file_path.split('/')
+      var split_path: PackedStringArray = file_path.split('/')
       var file_name := split_path[split_path.size() - 1]
-      split_path.remove(split_path.size() - 1)
+      split_path.remove_at(split_path.size() - 1)
 
       if file_name == 'mappings.txt':
-        var m_file := File.new()
-        m_file.open('user://mappings_tmp.txt', File.WRITE_READ)
+        var m_file := FileAccess.open('user://mappings_tmp.txt', FileAccess.WRITE_READ)
         m_file.store_buffer(gd_unzip.uncompress(file_path))
         m_file.seek(0)
         
-        var map_file := File.new()
-        map_file.open('user://content/resource_map.txt', File.READ_WRITE)
+        var map_file := FileAccess.open('user://content/resource_map.txt', FileAccess.READ_WRITE)
         map_file.seek_end()
         
         while !m_file.eof_reached():
@@ -237,7 +263,7 @@ func _import(path: String):
         
         map_file.close()
         m_file.close()
-        Directory.new().remove('user://mappings_tmp.txt')
+        DirAccess.remove_absolute('user://mappings_tmp.txt')
 
       _import_status.progress += 1
 
@@ -260,7 +286,7 @@ func _calculate_mipmap_bytes(width: int, height: int, levels: int):
   
   return bytes
 
-func _convert_dds_to_image(bytes: PoolByteArray) -> Image:
+func _convert_dds_to_image(bytes: PackedByteArray) -> Image:
   var buffer := StreamPeerBuffer.new()
   buffer.data_array = bytes
   
@@ -316,9 +342,10 @@ func _convert_dds_to_image(bytes: PoolByteArray) -> Image:
   elif four_cc == 'DXT3': format = Image.FORMAT_DXT3
   elif four_cc == 'DXT5': format = Image.FORMAT_DXT5
   
+  var image_data = buffer.get_data(pitch_or_linear_size)[1]
+  
   # these DDS files do have their own mipmaps, but for some reason, some of them are missing 16 bytes, so generate our own
-  var image := Image.new()
-  image.create_from_data(width, height, false, format, buffer.get_data(pitch_or_linear_size)[1])
+  var image := Image.create_from_data(width, height, false, format, image_data)
   
   logger.debug('bytes left ' + str(buffer.get_available_bytes()), logger.DebugLevel.EXTREME)
   
@@ -327,7 +354,8 @@ func _convert_dds_to_image(bytes: PoolByteArray) -> Image:
 func start_import(path: String):
   $JarSelect.hide()
   $ImportStage.show()
-  _import_thread.start(self, '_import', path)
+  _import_thread.start(Callable(self, '_import').bind(path))
+  #call_deferred('_import', path)
   
   for jar in ['pmk.jar']:
     var gd_unzip := GDUnzip.new()

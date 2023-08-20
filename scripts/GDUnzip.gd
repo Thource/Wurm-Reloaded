@@ -56,8 +56,8 @@ class_name GDUnzip
 # The path of the currently loaded zip file
 var path
 
-# A PoolByteArray with the contents of the zip file
-var buffer
+# A PackedByteArray with the contents of the zip file
+var buffer: PackedByteArray
 
 # The size of the currently loaded buffer
 var buffer_size
@@ -78,7 +78,7 @@ var pos = 0
 
 # An instance of the inner Tinf class, which is a GDScript port of Jørgen
 # Ibsen's excellent "tiny inflate library"
-var tinf
+var tinf: Tinf
 
 # Initialize the gdunzip class
 func _init():
@@ -92,13 +92,11 @@ func load(path):
     self.path = path
     self.pos = 0
 
-    var file = File.new()
-
-    if !file.file_exists(path):
+    if !FileAccess.file_exists(path):
         return false
 
-    file.open(path, File.READ)
-    var file_length = file.get_len()
+    var file := FileAccess.open(path, FileAccess.READ)
+    var file_length = file.get_length()
     if file.get_32() != 0x04034B50:
         return false
 
@@ -183,7 +181,7 @@ func _get_files():
         if raw[10] == 0 && raw[11] == 0:
             header['compression_method'] = -1
         else:
-            header['compression_method'] = File.COMPRESSION_DEFLATE
+            header['compression_method'] = FileAccess.COMPRESSION_DEFLATE
 
         header['compressed_size'] = (
             raw[23] << 24
@@ -215,16 +213,16 @@ func _get_files():
             return false
 
         header['file_name'] = (
-            raw_end.subarray(0, file_name_length - 1).get_string_from_utf8()
+            raw_end.slice(0, file_name_length).get_string_from_utf8()
         )
         self.files[header['file_name']] = header
 
     return true
 
 # Read a given number of bytes from the buffer, and return it as a
-# PoolByteArray
+# PackedByteArray
 func _read(length):
-    var result = buffer.subarray(pos, pos + length - 1)
+    var result = buffer.slice(pos, pos + length)
     if result.size() != length:
         return false
     pos = pos + length
@@ -259,12 +257,12 @@ class Tinf:
     # -- GDscript specific helper functions --
     # ----------------------------------------
     func make_pool_int_array(size):
-        var pool_int_array = PoolIntArray()
+        var pool_int_array = PackedInt32Array()
         pool_int_array.resize(size)
         return pool_int_array
 
     func make_pool_byte_array(size):
-        var pool_byte_array = PoolByteArray()
+        var pool_byte_array = PackedByteArray()
         pool_byte_array.resize(size)
         return pool_byte_array
 
@@ -278,7 +276,7 @@ class Tinf:
     }
 
     var TINF_DATA = {
-        'source': PoolByteArray(),
+        'source': PackedByteArray(),
         # sourcePtr is an "int" that's used to point at a location in "source".
         # I added this since we don't have pointer arithmetic in GDScript.
         'sourcePtr': 0,
@@ -286,7 +284,7 @@ class Tinf:
         'tag': 0,
         'bitcount': 0,
 
-        'dest': PoolByteArray(),
+        'dest': PackedByteArray(),
         'destLen': 0,
 
         # "Faux pointer" to dest.
@@ -316,7 +314,7 @@ class Tinf:
         'dist_base': make_pool_int_array(30)
     }
 
-    var clcidx = PoolByteArray([
+    var clcidx = PackedByteArray([
        16, 17, 18, 0, 8, 7, 9, 6,
        10, 5, 11, 4, 12, 3, 13, 2,
        14, 1, 15])

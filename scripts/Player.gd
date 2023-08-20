@@ -1,6 +1,6 @@
 class_name Player
 
-extends Spatial
+extends Node3D
 
 var bridge_id: int
 var kingdom_id: int
@@ -14,7 +14,7 @@ func _process(_delta):
 
 func teleport_to(x: float, h: float, y: float, y_rot: float, local: bool, layer: int, disembark: bool,
                  command_type: int, login_teleport: bool, teleport_counter: int):
-  transform.origin = Vector3(x * 4.0, h, y * 4.0)
+  transform.origin = Vector3(x, h, y)
 
 func set_model(model_name: String):
   add_child(resource_resolver.load_model(model_name))

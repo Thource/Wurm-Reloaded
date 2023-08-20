@@ -20,13 +20,14 @@ var last_update := 0
 var _new_seed := 0
 var _new_seed_pointer := 0
 
-onready var world: WurmWorld = $"../WurmWorld"
-onready var bmls: Control = $"../GUI/BMLs"
+@onready var world: WurmWorld = $"../WurmWorld"
+@onready var bmls: Control = $"../GUI/BMLs"
 
 func _init():
   write_buffer.big_endian = true
 
 func connect_to_server(ip_address: String, port: int, server_password: String, username: String):
+  logger.info('Connecting to server')
   self.ip_address = ip_address
   self.port = port
   self.server_password = server_password
@@ -38,10 +39,17 @@ func connect_to_server(ip_address: String, port: int, server_password: String, u
     return
   
   logger.info('Connecting to server ' + ip_address + ':' + str(port) + ' as ' + username + '.')
+  var waits := 0
   while(stream_peer.get_status() == stream_peer.STATUS_CONNECTING):
+    stream_peer.poll()
     OS.delay_msec(100)
+    waits += 1
+    
+    if waits == 50:
+      logger.error('Connection timed out')
+      return
   
-  if (stream_peer.get_status() == stream_peer.STATUS_ERROR):
+  if stream_peer.get_status() == stream_peer.STATUS_ERROR:
     logger.error('An error occurred while connecting to server.')
     return
   logger.info('Connected to server.')
@@ -51,7 +59,7 @@ func connect_to_server(ip_address: String, port: int, server_password: String, u
   
   _send_steam_auth()
 
-func _write_packet(bytes: PoolByteArray):
+func _write_packet(bytes: PackedByteArray):
   var packet_buf := ExtendedStreamPeerBuffer.new()
   packet_buf.big_endian = true
   packet_buf.put_16(bytes.size())
@@ -161,7 +169,7 @@ func _recv_login(buf: ExtendedStreamPeerBuffer):
   world.set_world_size(world_size)
   world.set_initial_wurm_time(wurm_time_seconds)
   
-  var player := world.create_player()
+  var player := world.create_player(true)
   player.teleport_to(x, h, y, y_rot, false, layer, true, command_type, true, teleport_counter)
   player.set_model(model)
   player.set_ground_offset(ground_offset as int, true, false)
@@ -295,13 +303,17 @@ class BMLData:
 func _open_bml(bml_data: BMLData):
   var bml_node := BMLParser.parse(bml_data.content)
   bmls.add_child(bml_node)
-  var vp_size := get_viewport().size
+  var vp_size := get_viewport().get_visible_rect().size
   var pos := Vector2((vp_size.x * bml_data.x) - (bml_data.width / 2), (vp_size.y * bml_data.y) - (bml_data.height / 2))
-  bml_node.popup(Rect2(pos, Vector2(bml_data.width, bml_data.height)))
-  bml_node.window_title = bml_data.title
-  bml_node.resizable = bml_data.can_resize
-  if !bml_data.can_close: bml_node.get_close_button().hide()
-  bml_node.connect('button_pressed', self, '_bml_button_pressed')
+  bml_node.position = pos
+  bml_node.size = Vector2(bml_data.width, bml_data.height)
+  bml_node.show()
+  bml_node.title = bml_data.title
+  bml_node.unresizable = !bml_data.can_resize
+  if !bml_data.can_close:
+    bml_node.add_theme_constant_override('close_h_offset', -16384)
+    bml_node.add_theme_constant_override('close_v_offset', -16384)
+  bml_node.connect('button_pressed', Callable(self, '_bml_button_pressed').bind(bml_node))
 
 var _partial_bml: BMLData
 func _recv_form(buf: ExtendedStreamPeerBuffer):
@@ -326,7 +338,7 @@ func _recv_form(buf: ExtendedStreamPeerBuffer):
     _open_bml(_partial_bml)
     _partial_bml = null
 
-func _bml_button_pressed(button_pressed: String, value_dict: Dictionary):
+func _bml_button_pressed(button_pressed: String, value_dict: Dictionary, bml_node: Node):
   var data_buf := ExtendedStreamPeerBuffer.new()
   data_buf.big_endian = true
   
@@ -348,6 +360,7 @@ func _bml_button_pressed(button_pressed: String, value_dict: Dictionary):
     data_buf.put_string_16(values[i])
   
   _write_packet(data_buf.data_array)
+  bml_node.queue_free()
 
 func _recv_toggle_switch(buf: ExtendedStreamPeerBuffer):
   var toggle := buf.get_u8()
@@ -717,23 +730,25 @@ func _recv_tilestrip(buf: ExtendedStreamPeerBuffer):
   var height := buf.get_16()
   var x_start := buf.get_16()
   var tiles := []
-  var waters := []
+  var water := []
   var extra := []
   
   for x in range(width):
     tiles.append([])
-    waters.append([])
+    water.append([])
     extra.append([])
     
     for y in range(height):
       tiles[x].append(buf.get_32())
-      waters[x].append(buf.get_16() if has_water else 0)
-      waters[x].append(buf.get_8() if has_extra else 0)
+      water[x].append(buf.get_16() if has_water else 0)
+      extra[x].append(buf.get_8() if has_extra else 0)
   
-#  print('TILESTRIP has_water: ', has_water, ', has_extra: ', has_extra, 
-#    ', x_start: ', x_start, ', y_start: ', y_start, ', width: ', width, 
-#    ', height: ', height, ', tiles: ', tiles, ', waters: ', waters, 
-#    ', extras: ', extra)
+  logger.debug_extreme('TILESTRIP has_water: ' + str(has_water) + ', has_extra: ' + str(has_extra) +  
+    ', x_start: ' + str(x_start) + ', y_start: ' + str(y_start) + ', width: ' + str(width) + 
+    ', height: ' + str(height) + ', tiles: ' + str(tiles) + ', water: ' + str(water) + 
+    ', extras: ' + str(extra))
+  
+  world.add_tilestrip(has_water, has_extra, x_start, y_start, width, height, tiles, water, extra)
 
 func _recv_creature_layer(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
@@ -781,9 +796,10 @@ func _recv_add_creature(buf: ExtendedStreamPeerBuffer):
     ', kingdom: ' + str(kingdom) + ', face: ' + str(face) + ', blood_kingdom: ' + str(blood_kingdom) +
     ', mod_type: ' + str(mod_type) + ', rarity: ' + str(rarity))
   
-  var wom_model := ResourceResolver.load_model(model)
-  wom_model.translation = Vector3(rand_range(-4, 4), rand_range(-4, 4), rand_range(-4, 4))
-  world.add_child(wom_model)
+  world.add_creature(
+    id, model, solid, x, y, bridge_id, rot, h, name, hover_text, floating, layer, type, material_id,
+    sound_source_id, kingdom, face, blood_kingdom, mod_type, rarity
+  )
 
 func _recv_resize(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
@@ -972,6 +988,14 @@ func _recv_repaint(buf: ExtendedStreamPeerBuffer):
 func _recv_start_moving():
   logger.debug_extreme('START_MOVING')
 
+func _recv_water(buf: ExtendedStreamPeerBuffer):
+  var x := buf.get_u16()
+  var y := buf.get_u16()
+  var layer := buf.get_u8()
+  var height := buf.get_u16()
+  
+  logger.debug_extreme('WATER x: ' + str(x) + ' y: ' + str(y) + ', layer: ' + str(layer) + ', height: ' + str(height))
+
 func _recv_move_creature(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
   var y := buf.get_float()
@@ -980,6 +1004,14 @@ func _recv_move_creature(buf: ExtendedStreamPeerBuffer):
   
   logger.debug_extreme('MOVE_CREATURE id: ' + str(id) + ', x: ' + str(x) + ', y: ' + str(y) +
     ', rot_diff: ' + str(rot_diff))
+  
+  var creature := world.get_creature(id)
+  if creature == null:
+    logger.error('Tried to move non-existant creature: ' + str(id))
+    return
+  
+  creature.position = Vector3(x, creature.position.y, y)
+  creature.rotation_degrees += Vector3(0, rot_diff, 0)
 
 func _recv_move_creature_and_set_z(buf: ExtendedStreamPeerBuffer):
   var id := buf.get_64()
@@ -990,6 +1022,14 @@ func _recv_move_creature_and_set_z(buf: ExtendedStreamPeerBuffer):
   
   logger.debug_extreme('MOVE_CREATURE_AND_SET_Z id: ' + str(id) + ', x: ' + str(x) + ', y: ' + str(y) +
     ', h: ' + str(h) + ', rot_diff: ' + str(rot_diff))
+  
+  var creature := world.get_creature(id)
+  if creature == null:
+    logger.error('Tried to move non-existant creature: ' + str(id))
+    return
+  
+  creature.position = Vector3(x, 315, y)
+  creature.rotation_degrees += Vector3(0, rot_diff, 0)
 
 func _recv_tilestrip_far(buf: ExtendedStreamPeerBuffer):
   var x_start := buf.get_16()
@@ -1022,12 +1062,12 @@ func _recv_server_time(buf: ExtendedStreamPeerBuffer):
   
   logger.debug_extreme('SERVER_TIME server_time_ms: ' + str(server_time_ms) + ', wurm_time_s: ' + str(wurm_time_s))
 
-func _handle_recv(bytes: PoolByteArray):
+func _handle_recv(bytes: PackedByteArray):
   var buf := ExtendedStreamPeerBuffer.new()
   buf.big_endian = true
   buf.data_array = bytes
   
-  match buf.get_u8():
+  match buf.get_8():
     -52: _recv_steam_auth(buf)
     -50: pass # VALREI MAP
     -47: _recv_status_effect_bar(buf)
@@ -1038,6 +1078,7 @@ func _handle_recv(bytes: PoolByteArray):
     -33: _recv_update_player_titles(buf)
     -30: _recv_toggle_client_feature(buf)
     -28: _recv_start_moving()
+    -19: _recv_water(buf)
     -18: _recv_set_status(buf)
     -16: _recv_set_item_is_empty(buf)
     -15: _recv_login(buf)
@@ -1085,6 +1126,63 @@ func _handle_recv(bytes: PoolByteArray):
     109: _recv_attach_effect(buf)
     112: _recv_add_structure(buf)
     124: _recv_set_skill(buf)
+#    76: _recv_steam_auth(buf)
+#    78: pass # VALREI MAP
+#    81: _recv_status_effect_bar(buf)
+#    83: _recv_send_map_info(buf)
+#    85: _recv_map_annotations(buf)
+#    89: _recv_personal_goal_list(buf)
+#    94: _recv_ticket_add(buf)
+#    95: _recv_update_player_titles(buf)
+#    98: _recv_toggle_client_feature(buf)
+#    100: _recv_start_moving()
+#    110: _recv_set_status(buf)
+#    112: _recv_set_item_is_empty(buf)
+#    113: _recv_login(buf)
+#    115: _recv_join_group(buf)
+#    119: _recv_add_item(buf)
+#    129: _recv_sleep_bonus_info(buf)
+#    134: _recv_set_creature_attitude(buf)
+#    135: _recv_add_spell_effect(buf)
+#    139: _recv_set_creature_damage(buf)
+#    140: _recv_add_fence(buf)
+#    145: _recv_remove_spell_effect(buf)
+#    149: _recv_add_clothing(buf)
+#    155: _recv_set_fight_style(buf)
+#    157: _recv_set_item_has_items(buf)
+#    158: _recv_creature_layer(buf)
+#    160: _recv_set_speed_modifier(buf)
+#    164: _recv_move_creature(buf)
+#    166: _recv_new_achievement(buf)
+#    168: _recv_send_all_kingdoms(buf)
+#    174: _recv_weather_update(buf)
+#    177: _recv_add_wall(buf)
+#    189: _recv_status_hunger(buf)
+#    190: _recv_toggle_switch(buf)
+#    192: _recv_add_effect(buf)
+#    198: _recv_update_inventory_item(buf)
+#    200: _recv_move_creature_and_set_z(buf)
+#    201: _recv_tilestrip(buf)
+#    202: _recv_resize(buf)
+#    204: _recv_add_to_inventory(buf)
+#    206: _recv_item_model_name(buf)
+#    207: _recv_climb(buf)
+#    210: _recv_add_floor(buf)
+#    217: _recv_update_friends_list(buf)
+#    218: _recv_status_stamina(buf)
+#    220: _recv_repaint(buf)
+#    224: _recv_build_mark(buf)
+#    227: _recv_message(buf)
+#    228: _recv_achievement_list(buf)
+#    229: _recv_set_equipment(buf)
+#    231: _recv_tilestrip_far(buf)
+#    233: _recv_status_thirst(buf)
+#    234: _recv_form(buf)
+#    235: _recv_server_time(buf)
+#    236: _recv_add_creature(buf)
+#    237: _recv_attach_effect(buf)
+#    240: _recv_add_structure(buf)
+#    252: _recv_set_skill(buf)
     var code:
       logger.warn('UNHANDLED RECV CODE: ' + str(code))
   
@@ -1094,11 +1192,11 @@ func _handle_recv(bytes: PoolByteArray):
     _new_seed = 0
 
 func _process(delta):
-  if !stream_peer.is_connected_to_host(): return
+  if stream_peer.get_status() == StreamPeerTCP.STATUS_NONE || stream_peer.get_status() == StreamPeerTCP.STATUS_ERROR: return
   
-  if last_update + 100 > OS.get_ticks_msec(): return
+  if last_update + 100 > Time.get_ticks_msec(): return
   
-  last_update = OS.get_ticks_msec()
+  last_update = Time.get_ticks_msec()
   
   var byte_count := stream_peer.get_available_bytes()
   while byte_count > 0:

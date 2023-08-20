@@ -13,7 +13,7 @@ var decrypt_add_byte := 0
 func _init():
   pass
 
-func encrypt(bytes: PoolByteArray) -> PoolByteArray:
+func encrypt(bytes: PackedByteArray) -> PackedByteArray:
   for i in range(bytes.size()):
     remaining_encrypt_bytes -= 1
     if remaining_encrypt_bytes < 0:
@@ -28,7 +28,7 @@ func encrypt(bytes: PoolByteArray) -> PoolByteArray:
   
   return bytes
 
-func decrypt(bytes: PoolByteArray) -> PoolByteArray:
+func decrypt(bytes: PackedByteArray) -> PackedByteArray:
   for i in range(bytes.size()):
     remaining_decrypt_bytes -= 1
     if remaining_decrypt_bytes < 0:

@@ -42,8 +42,8 @@ func get_scale() -> Vector3:
 func get_position() -> Vector3:
   return Vector3(m03, m13, m23)
 
-func get_quaternion() -> Quat:
-  var quat := Quat()
+func get_quaternion() -> Quaternion:
+  var quat := Quaternion()
   
   var t := m00 + m11 + m22
   var s: float
@@ -81,5 +81,5 @@ func get_quaternion() -> Quat:
 func get_basis() -> Basis:
   return Basis(get_quaternion())
 
-func get_transform() -> Transform:
-  return Transform(get_basis(), get_position() * get_scale())
+func get_transform() -> Transform3D:
+  return Transform3D(get_basis(), get_position() * get_scale())
