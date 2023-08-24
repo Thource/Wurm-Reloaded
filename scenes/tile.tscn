@@ -1,0 +1,26 @@
+[gd_scene load_steps=5 format=3 uid="uid://bw3yjtxakpcvr"]
+
+[ext_resource type="Script" path="res://scripts/Tile.gd" id="1_73xo5"]
+[ext_resource type="Texture2D" path="user://content/textures/texture/terrain/grass.tres" id="2_ii618"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bklcg"]
+albedo_texture = ExtResource("2_ii618")
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_2ci0x"]
+_surfaces = [{
+"aabb": AABB(-2, 0, -2, 4.00001, 1e-05, 4.00001),
+"attribute_data": PackedByteArray(0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+"format": 4119,
+"index_count": 6,
+"index_data": PackedByteArray(0, 0, 1, 0, 2, 0, 1, 0, 3, 0, 2, 0),
+"primitive": 3,
+"vertex_count": 4,
+"vertex_data": PackedByteArray(0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 64, 0, 128, 255, 255, 255, 255, 255, 191, 0, 0, 0, 192, 0, 0, 0, 0, 0, 0, 0, 64, 0, 128, 255, 255, 255, 255, 255, 191, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 192, 0, 128, 255, 255, 255, 255, 255, 191, 0, 0, 0, 192, 0, 0, 0, 0, 0, 0, 0, 192, 0, 128, 255, 255, 255, 255, 255, 191)
+}]
+
+[node name="Tile" type="Node3D"]
+script = ExtResource("1_73xo5")
+
+[node name="MeshInstance" type="MeshInstance3D" parent="."]
+material_override = SubResource("StandardMaterial3D_bklcg")
+mesh = SubResource("ArrayMesh_2ci0x")

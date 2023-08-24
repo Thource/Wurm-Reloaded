@@ -228,11 +228,11 @@ func _recv_update_inventory_item(buf: ExtendedStreamPeerBuffer):
   var rarity := buf.get_8()
   var material := buf.get_8()
   var image_number := buf.get_16()
-  logger.debug_extreme('UPDATE_INVENTORY_ITEM inventory_id: ' + str(inventory_id) + ', item_id: ' + str(item_id) + 
-    ', parent_id: ' + str(parent_id) + ', name: ' + name + ', description: ' + description + 
-    ', quality: ' + str(quality) + ', damage: ' + str(damage) + ', weight: ' + str(weight) + ', r: ' + str(r) + 
-    ', g: ' + str(g) + ', b: ' + str(b) + ', price: ' + str(price) + 
-    ', improve_image_number: ' + str(improve_image_number) + ', temperature: ' + str(temperature) + 
+  logger.debug_extreme('UPDATE_INVENTORY_ITEM inventory_id: ' + str(inventory_id) + ', item_id: ' + str(item_id) +
+    ', parent_id: ' + str(parent_id) + ', name: ' + name + ', description: ' + description +
+    ', quality: ' + str(quality) + ', damage: ' + str(damage) + ', weight: ' + str(weight) + ', r: ' + str(r) +
+    ', g: ' + str(g) + ', b: ' + str(b) + ', price: ' + str(price) +
+    ', improve_image_number: ' + str(improve_image_number) + ', temperature: ' + str(temperature) +
     ', rarity: ' + str(rarity) + ', material: ' + str(material) + ', image_number: ' + str(image_number))
 
 func _recv_add_to_inventory(buf: ExtendedStreamPeerBuffer):
@@ -267,12 +267,12 @@ func _recv_add_to_inventory(buf: ExtendedStreamPeerBuffer):
   var temperature := buf.get_8()
   var rarity := buf.get_8()
   var aux_data := buf.get_8()
-  logger.debug_extreme('ADD_TO_INVENTORY inventory_id: ' + str(inventory_id) + ', item_id: ' + str(item_id) + 
-    ', parent_id: ' + str(parent_id) + ', name: ' + name + ', description: ' + description + 
-    ', quality: ' + str(quality) + ', damage: ' + str(damage) + ', weight: ' + str(weight) + ', r: ' + str(r) + 
-    ', g: ' + str(g) + ', b: ' + str(b) + ', price: ' + str(price) + 
-    ', improve_image_number: ' + str(improve_image_number) + ', temperature: ' + str(temperature) + 
-    ', rarity: ' + str(rarity) + ', material: ' + str(material) + ', image_number: ' + str(image_number) + 
+  logger.debug_extreme('ADD_TO_INVENTORY inventory_id: ' + str(inventory_id) + ', item_id: ' + str(item_id) +
+    ', parent_id: ' + str(parent_id) + ', name: ' + name + ', description: ' + description +
+    ', quality: ' + str(quality) + ', damage: ' + str(damage) + ', weight: ' + str(weight) + ', r: ' + str(r) +
+    ', g: ' + str(g) + ', b: ' + str(b) + ', price: ' + str(price) +
+    ', improve_image_number: ' + str(improve_image_number) + ', temperature: ' + str(temperature) +
+    ', rarity: ' + str(rarity) + ', material: ' + str(material) + ', image_number: ' + str(image_number) +
     ', hover_text: ' + hover_text + ', profile: ' + str(profile) + ', aux_data: ' + str(aux_data))
 
 func _recv_message(buf: ExtendedStreamPeerBuffer):
@@ -384,7 +384,7 @@ func _recv_send_map_info(buf: ExtendedStreamPeerBuffer):
   var cluster := buf.get_8()
   var is_epic := cluster != 0
   
-  logger.debug_extreme('SEND_MAP_INFO server_name: ' + server_name + ', cluster: ' + str(cluster) + 
+  logger.debug_extreme('SEND_MAP_INFO server_name: ' + server_name + ', cluster: ' + str(cluster) +
     ', is_epic: ' + str(is_epic))
 
 func _recv_map_annotations(buf: ExtendedStreamPeerBuffer):
@@ -403,15 +403,15 @@ func _recv_map_annotations(buf: ExtendedStreamPeerBuffer):
         var annotation_name := buf.get_string_16()
         var icon_id := buf.get_8()
         
-        logger.debug_extreme('MAP_ANNOTATION ADD id: ' + str(id) + ', type: ' + str(type) + 
-          ', server_name: ' + server_name + ', x: ' + str(x) + ', y: ' + str(y) + 
+        logger.debug_extreme('MAP_ANNOTATION ADD id: ' + str(id) + ', type: ' + str(type) +
+          ', server_name: ' + server_name + ', x: ' + str(x) + ', y: ' + str(y) +
           ', annotation_name: ' + annotation_name + ', icon_id: ' + str(icon_id))
     1:
       var id := buf.get_64()
       var type := buf.get_8()
       var server_name := buf.get_string_16()
       
-      logger.debug_extreme('MAP_ANNOTATION REMOVE id: ' + str(id) + ', type: ' + str(type) + 
+      logger.debug_extreme('MAP_ANNOTATION REMOVE id: ' + str(id) + ', type: ' + str(type) +
         ', server_name: ' + server_name)
     2:
       var has_village_permission := buf.get_8() != 0
@@ -743,9 +743,9 @@ func _recv_tilestrip(buf: ExtendedStreamPeerBuffer):
       water[x].append(buf.get_16() if has_water else 0)
       extra[x].append(buf.get_8() if has_extra else 0)
   
-  logger.debug_extreme('TILESTRIP has_water: ' + str(has_water) + ', has_extra: ' + str(has_extra) +  
-    ', x_start: ' + str(x_start) + ', y_start: ' + str(y_start) + ', width: ' + str(width) + 
-    ', height: ' + str(height) + ', tiles: ' + str(tiles) + ', water: ' + str(water) + 
+  logger.debug_extreme('TILESTRIP has_water: ' + str(has_water) + ', has_extra: ' + str(has_extra) +
+    ', x_start: ' + str(x_start) + ', y_start: ' + str(y_start) + ', width: ' + str(width) +
+    ', height: ' + str(height) + ', tiles: ' + str(tiles) + ', water: ' + str(water) +
     ', extras: ' + str(extra))
   
   world.add_tilestrip(has_water, has_extra, x_start, y_start, width, height, tiles, water, extra)
@@ -1083,18 +1083,21 @@ func _handle_recv(bytes: PackedByteArray):
     -16: _recv_set_item_is_empty(buf)
     -15: _recv_login(buf)
     -13: _recv_join_group(buf)
+    -12: pass # _recv_action_control(buf)
     -9: _recv_add_item(buf)
     1: _recv_sleep_bonus_info(buf)
     6: _recv_set_creature_attitude(buf)
     7: _recv_add_spell_effect(buf)
     11: _recv_set_creature_damage(buf)
     12: _recv_add_fence(buf)
+    14: pass # _recv_delete_moving_item_or_creature(buf)
     17: _recv_remove_spell_effect(buf)
     21: _recv_add_clothing(buf)
     26: _recv_set_fight_style(buf)
     29: _recv_set_item_has_items(buf)
     30: _recv_creature_layer(buf)
     32: _recv_set_speed_modifier(buf)
+    33: pass # _recv_mission_state(buf)
     36: _recv_move_creature(buf)
     38: _recv_new_achievement(buf)
     40: _recv_send_all_kingdoms(buf)
@@ -1104,6 +1107,7 @@ func _handle_recv(bytes: PackedByteArray):
     62: _recv_toggle_switch(buf)
     64: _recv_add_effect(buf)
     68: _recv_update_inventory_item(buf)
+    71: pass # _recv_stop_use_item(buf)
     72: _recv_move_creature_and_set_z(buf)
     73: _recv_tilestrip(buf)
     74: _recv_resize(buf)
@@ -1111,6 +1115,7 @@ func _handle_recv(bytes: PackedByteArray):
     78: _recv_item_model_name(buf)
     79: _recv_climb(buf)
     82: _recv_add_floor(buf)
+    86: pass # _recv_sound(buf)
     89: _recv_update_friends_list(buf)
     90: _recv_status_stamina(buf)
     92: _recv_repaint(buf)
@@ -1124,65 +1129,10 @@ func _handle_recv(bytes: PackedByteArray):
     107: _recv_server_time(buf)
     108: _recv_add_creature(buf)
     109: _recv_attach_effect(buf)
+    110: pass # _recv_use_item(buf)
     112: _recv_add_structure(buf)
+    115: pass # _recv_music(buf)
     124: _recv_set_skill(buf)
-#    76: _recv_steam_auth(buf)
-#    78: pass # VALREI MAP
-#    81: _recv_status_effect_bar(buf)
-#    83: _recv_send_map_info(buf)
-#    85: _recv_map_annotations(buf)
-#    89: _recv_personal_goal_list(buf)
-#    94: _recv_ticket_add(buf)
-#    95: _recv_update_player_titles(buf)
-#    98: _recv_toggle_client_feature(buf)
-#    100: _recv_start_moving()
-#    110: _recv_set_status(buf)
-#    112: _recv_set_item_is_empty(buf)
-#    113: _recv_login(buf)
-#    115: _recv_join_group(buf)
-#    119: _recv_add_item(buf)
-#    129: _recv_sleep_bonus_info(buf)
-#    134: _recv_set_creature_attitude(buf)
-#    135: _recv_add_spell_effect(buf)
-#    139: _recv_set_creature_damage(buf)
-#    140: _recv_add_fence(buf)
-#    145: _recv_remove_spell_effect(buf)
-#    149: _recv_add_clothing(buf)
-#    155: _recv_set_fight_style(buf)
-#    157: _recv_set_item_has_items(buf)
-#    158: _recv_creature_layer(buf)
-#    160: _recv_set_speed_modifier(buf)
-#    164: _recv_move_creature(buf)
-#    166: _recv_new_achievement(buf)
-#    168: _recv_send_all_kingdoms(buf)
-#    174: _recv_weather_update(buf)
-#    177: _recv_add_wall(buf)
-#    189: _recv_status_hunger(buf)
-#    190: _recv_toggle_switch(buf)
-#    192: _recv_add_effect(buf)
-#    198: _recv_update_inventory_item(buf)
-#    200: _recv_move_creature_and_set_z(buf)
-#    201: _recv_tilestrip(buf)
-#    202: _recv_resize(buf)
-#    204: _recv_add_to_inventory(buf)
-#    206: _recv_item_model_name(buf)
-#    207: _recv_climb(buf)
-#    210: _recv_add_floor(buf)
-#    217: _recv_update_friends_list(buf)
-#    218: _recv_status_stamina(buf)
-#    220: _recv_repaint(buf)
-#    224: _recv_build_mark(buf)
-#    227: _recv_message(buf)
-#    228: _recv_achievement_list(buf)
-#    229: _recv_set_equipment(buf)
-#    231: _recv_tilestrip_far(buf)
-#    233: _recv_status_thirst(buf)
-#    234: _recv_form(buf)
-#    235: _recv_server_time(buf)
-#    236: _recv_add_creature(buf)
-#    237: _recv_attach_effect(buf)
-#    240: _recv_add_structure(buf)
-#    252: _recv_set_skill(buf)
     var code:
       logger.warn('UNHANDLED RECV CODE: ' + str(code))
   

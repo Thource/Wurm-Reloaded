@@ -28,8 +28,8 @@ func error_fatal(text: String):
   _log('[ERROR] [FATAL] ' + text)
 
 func debug(text: String, debug_level := DebugLevel.BASIC):
-#  if debug_level == DebugLevel.EXTREME:
-#    return
+  if debug_level == DebugLevel.EXTREME:
+    return
   
   _log('[DEBUG] [' + DebugLevel.keys()[debug_level] + '] ' + text)
   #pass

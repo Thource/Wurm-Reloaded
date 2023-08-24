@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/Tile.gd" id="1_vr8kl"]
+
+[node name="@Node3D@4" type="Node3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3104, 285.3, 5696)
+script = ExtResource("1_vr8kl")
