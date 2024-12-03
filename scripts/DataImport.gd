@@ -31,7 +31,7 @@ class LoadedResource:
 var _loaded_resources: Array[LoadedResource] = []
 
 func _fling_texture(image_texture: ImageTexture):
-  return
+  #return
   
   var loaded_resource := LoadedResource.new()
   var spatial := Node3D.new()
@@ -47,7 +47,7 @@ func _fling_texture(image_texture: ImageTexture):
   _loaded_resources.push_back(loaded_resource)
 
 func _fling_model(model_scene: PackedScene):
-  return
+  #return
   
   var loaded_resource := LoadedResource.new()
   var spatial = model_scene.instantiate()
@@ -118,74 +118,72 @@ func _import(path: String):
       
       _import_status.progress += 1
 
-#  _import_status.set_stage('Importing sounds', 0)
-#  for jar_ind in range(jars.size()):
-#    _import_status.max_progress += jar_files_by_extensions[jar_ind].get('ogg', []).size()
-#
-#  for jar_ind in range(jars.size()):
-#    var jar_name: String = jars[jar_ind].replace('.jar', '')
-#    var gd_unzip = gd_unzips[jar_ind]
-#
-#    for file_path in jar_files_by_extensions[jar_ind].get('ogg', []):
-#      var split_path: PoolStringArray = file_path.split('/')
-#      split_path.remove(split_path.size() - 1)
-#      Directory.new().make_dir_recursive('user://content/' + jar_name + '/' + split_path.join('/'))
-#
-#      var file := File.new()
-#      file.open('user://content/' + jar_name + '/' + file_path, File.WRITE)
-#      file.store_buffer(gd_unzip.uncompress(file_path))
-#      file.close()
-#
-#      _import_status.progress += 1
-#
-#  _import_status.set_stage('Importing images', 0)
-#  for jar_ind in range(jars.size()):
-#    _import_status.max_progress += jar_files_by_extensions[jar_ind].get('png', []).size()
-#    _import_status.max_progress += jar_files_by_extensions[jar_ind].get('jpg', []).size()
-#    _import_status.max_progress += jar_files_by_extensions[jar_ind].get('gif', []).size()
-#
-#  for jar_ind in range(jars.size()):
-#    var files: Array = jar_files_by_extensions[jar_ind].get('png', [])
-#    files += jar_files_by_extensions[jar_ind].get('jpg', [])
-#    files += jar_files_by_extensions[jar_ind].get('gif', [])
-#
-#    var jar_name: String = jars[jar_ind].replace('.jar', '')
-#    var gd_unzip = gd_unzips[jar_ind]
-#
-#    for file_path in files:
-#      var split_path: PoolStringArray = file_path.split('/')
-#      split_path.remove(split_path.size() - 1)
-#      Directory.new().make_dir_recursive('user://content/' + jar_name + '/' + split_path.join('/'))
-#
-#      var file := File.new()
-#      file.open('user://content/' + jar_name + '/' + file_path, File.WRITE)
-#      file.store_buffer(gd_unzip.uncompress(file_path))
-#      file.close()
-#
-#      _import_status.progress += 1
+  _import_status.set_stage('Importing sounds', 0)
+  for jar_ind in range(jars.size()):
+    _import_status.max_progress += jar_files_by_extensions[jar_ind].get('ogg', []).size()
 
-#  _import_status.set_stage('Importing textures', 0)
-#  var texture_count := 0
-#  for jar_ind in range(jars.size()):
-#    texture_count += jar_files_by_extensions[jar_ind].get('dds', []).size()
-#  _import_status.set_stage('Importing textures', texture_count)
+  for jar_ind in range(jars.size()):
+    var jar_name: String = jars[jar_ind].replace('.jar', '')
+    var gd_unzip = gd_unzips[jar_ind]
+
+    for file_path in jar_files_by_extensions[jar_ind].get('ogg', []):
+      var split_path: PackedStringArray = file_path.split('/')
+      split_path.remove_at(split_path.size() - 1)
+      DirAccess.make_dir_recursive_absolute('user://content/' + jar_name + '/' + '/'.join(split_path))
+
+      var file := FileAccess.open('user://content/' + jar_name + '/' + file_path, FileAccess.WRITE)
+      file.store_buffer(gd_unzip.uncompress(file_path))
+      file.close()
+
+      _import_status.progress += 1
+
+  _import_status.set_stage('Importing images', 0)
+  for jar_ind in range(jars.size()):
+    _import_status.max_progress += jar_files_by_extensions[jar_ind].get('png', []).size()
+    _import_status.max_progress += jar_files_by_extensions[jar_ind].get('jpg', []).size()
+    _import_status.max_progress += jar_files_by_extensions[jar_ind].get('gif', []).size()
+
+  for jar_ind in range(jars.size()):
+    var files: Array = jar_files_by_extensions[jar_ind].get('png', [])
+    files += jar_files_by_extensions[jar_ind].get('jpg', [])
+    files += jar_files_by_extensions[jar_ind].get('gif', [])
+
+    var jar_name: String = jars[jar_ind].replace('.jar', '')
+    var gd_unzip = gd_unzips[jar_ind]
+
+    for file_path in files:
+      var split_path: PackedStringArray = file_path.split('/')
+      split_path.remove_at(split_path.size() - 1)
+      DirAccess.make_dir_recursive_absolute('user://content/' + jar_name + '/' + '/'.join(split_path))
+
+      var file := FileAccess.open('user://content/' + jar_name + '/' + file_path, FileAccess.WRITE)
+      file.store_buffer(gd_unzip.uncompress(file_path))
+      file.close()
+
+      _import_status.progress += 1
+
+  #_import_status.set_stage('Importing textures', 0)
+  #var texture_count := 0
+  #for jar_ind in range(jars.size()):
+    #texture_count += jar_files_by_extensions[jar_ind].get('dds', []).size()
+  #_import_status.set_stage('Importing textures', texture_count)
 #
-#  for jar_ind in range(jars.size()):
-#    var gd_unzip = gd_unzips[jar_ind]
+  #for jar_ind in range(jars.size()):
+    #var gd_unzip = gd_unzips[jar_ind]
 #
-#    for file_path in jar_files_by_extensions[jar_ind].get('dds', []):
-#      var split_path: PackedStringArray = file_path.split('/')
-#      split_path.remove_at(split_path.size() - 1)
-#      DirAccess.make_dir_recursive_absolute('user://content/textures/' + '/'.join(split_path))
+    #for file_path in jar_files_by_extensions[jar_ind].get('dds', []):
+      #var split_path: PackedStringArray = file_path.split('/')
+      #split_path.remove_at(split_path.size() - 1)
+      #DirAccess.make_dir_recursive_absolute('user://content/textures/' + '/'.join(split_path))
 #
-#      var image := _convert_dds_to_image(gd_unzip.uncompress(file_path))
-#      var image_texture := ImageTexture.create_from_image(image)
+      #var image := _convert_dds_to_image(gd_unzip.uncompress(file_path))
+      #var image_texture := ImageTexture.create_from_image(image)
 ##      var image_texture := ImageTexture.new()
-#      ResourceSaver.save(image_texture, 'user://content/textures/' + file_path.replace('.dds', '.tres'))
+      #ResourceSaver.save(image_texture, 'user://content/textures/' + file_path.replace('.dds', '.tres'))
 #
-#      call_deferred('_fling_texture', image_texture)
+      #call_deferred('_fling_texture', image_texture)
 #
-#      _import_status.progress += 1
+      #_import_status.progress += 1
 
   _import_status.set_stage('Importing models', 0)
   var model_count := 0

@@ -1,4 +1,9 @@
 res://default_env.tres
 res://scenes/World.tscn
-res://scripts/Tile.gd
-res://scenes/tile.tscn
+res://scenes/DataImport.tscn
+res://scripts/WOMLoader.gd
+res://scripts/DataImport.gd
+res://scripts/GDUnzip.gd
+res://scripts/Play.gd
+res://scripts/Logger.gd
+res://scripts/WurmWorld.gd

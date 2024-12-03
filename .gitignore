@@ -3,3 +3,4 @@
 .import/
 logs/
 dist/
+.godot/shader_cache

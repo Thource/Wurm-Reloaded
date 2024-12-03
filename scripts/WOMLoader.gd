@@ -279,17 +279,18 @@ static func _load_model(gd_unzip, model_path: String) -> WOMModel:
       var material_name := material_data.name
     
       var material := resource_resolver.load_material_from_path(dir_path, texture_name)
-    
-      if material_data.emission:
-        material.emission_enabled = true
-        material.emission = material_data.emission
-      material.roughness = (100 - material_data.shininess) / 100.0
-      if material_data.specular:
-        material.metallic = material_data.specular.r
-      if material_data.transparency_color:
-        material.flags_transparent = true
-        material.params_depth_draw_mode = StandardMaterial3D.DEPTH_DRAW_ALWAYS
-      mesh_instance.mesh.surface_set_material(material_ind, material)
+      if material:
+        if material_data.emission:
+          material.emission_enabled = true
+          material.emission = material_data.emission
+        material.roughness = (100 - material_data.shininess) / 100.0
+        if material_data.specular:
+          material.metallic = material_data.specular.r
+        if material_data.transparency_color:
+          material.flags_transparent = true
+          material.params_depth_draw_mode = StandardMaterial3D.DEPTH_DRAW_ALWAYS
+          
+        mesh_instance.mesh.surface_set_material(material_ind, material)
   
   var properties_unc = gd_unzip.uncompress(dir_path + '/properties.xml')
   var properties_xml = properties_unc if properties_unc else PackedByteArray()
@@ -343,8 +344,9 @@ static func _load_model(gd_unzip, model_path: String) -> WOMModel:
       var model_anims: Dictionary = properties['anim']
       for anim_key in model_anims.keys():
         
-        var anim := _load_anim(gd_unzip, dir_path + '/' + model_anims[anim_key]['file'], wom_model_data)
-        animation_library.add_animation(anim_key, anim)
+        var anim = _load_anim(gd_unzip, dir_path + '/' + model_anims[anim_key]['file'].replace('//', '/'), wom_model_data)
+        if anim:
+          animation_library.add_animation(anim_key, anim)
       
       animation_player.add_animation_library('anims', animation_library)
   
@@ -358,7 +360,12 @@ static func _load_anim(gd_unzip, anim_path: String, wom_model_data: WOMModelData
   # print('anim ', anim_name, anim_path)
   
   var buf := ExtendedStreamPeerBuffer.new()
-  buf.data_array = gd_unzip.uncompress(anim_path)
+  var anim_data = gd_unzip.uncompress(anim_path)
+  if not anim_data:
+    print("MISSING ANIM: " + anim_path)
+    return null
+  
+  buf.data_array = anim_data
   
   var length := 0.0
   var joint_count := buf.get_32()

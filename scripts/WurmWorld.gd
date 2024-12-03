@@ -128,7 +128,7 @@ func add_tilestrip(
       
       if tile == null:
         tile = Tile.new(x, y, tile_height, data >> 24 & 255)
-        tiles_container.add_child(tile)
+        #tiles_container.add_child(tile)
         tiles[_get_tile_key(x, y)] = tile
       else:
         tile.set_height(tile_height)
