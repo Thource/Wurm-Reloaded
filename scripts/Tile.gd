@@ -29,9 +29,6 @@ func _init(x: int, y: int, height: float, type: int):
   self.x = x
   self.y = y
   self.height = height
-  east_height = height
-  south_height = height
-  south_east_height = height
   dirt_flags = DirtFlag.EAST | DirtFlag.SOUTH | DirtFlag.SOUTH_EAST
   set_type(Tiles.Type.get(type))
   
@@ -120,17 +117,19 @@ func update_mesh():
     mesh_data_tool.create_from_surface(mesh, 0)
     mesh_data_tool.set_vertex(3, Vector3(-2, 0, -2))
   
-  south_east_height = height
-  south_height = height
-  east_height = height
-  
   if dirt_flags & DirtFlag.SOUTH_EAST == DirtFlag.SOUTH_EAST:
+    if south_east_height - height > 10:
+      print('se ?? - h: ' + str(height) + ' seh: ' + str(south_east_height))
     mesh_data_tool.set_vertex(0, Vector3(2, south_east_height - height, 2))
     
   if dirt_flags & DirtFlag.SOUTH == DirtFlag.SOUTH:
+    if south_height - height > 10:
+      print('s ?? - h: ' + str(height) + ' sh: ' + str(south_height))
     mesh_data_tool.set_vertex(1, Vector3(-2, south_height - height, 2))
   
   if dirt_flags & DirtFlag.EAST == DirtFlag.EAST:
+    if east_height - height > 10:
+      print('e ?? - h: ' + str(height) + ' eh: ' + str(east_height))
     mesh_data_tool.set_vertex(2, Vector3(2, east_height - height, -2))
   
   call_deferred('_commit_mesh')

@@ -71,6 +71,8 @@ func add_creature(
     name: String, hover_text: String, floating: bool, layer: int, type: int, material_id: int, 
     sound_source_id: int, kingdom: int, face: int, blood_kingdom: int, mod_type: int, rarity: int
   ):
+  return
+  
   var creature := Creature.new(
     id, model, solid, x, y, bridge_id, rot, h, name, hover_text, floating, layer, type, material_id,
     sound_source_id, kingdom, face, blood_kingdom, mod_type, rarity
@@ -114,8 +116,8 @@ func add_tilestrip(
   has_water: bool, has_extra: bool, x_start: int, y_start: int, width: int, 
   height: int, tile_data, water_data, extra_data
 ):
-#  if strips >= 3:
-#    return
+  if strips >= 15:
+    return
   
   var start_time := Time.get_ticks_msec()
   
@@ -123,16 +125,19 @@ func add_tilestrip(
   for x in range(x_start, x_start + width):
     for y in range(y_start, y_start + height):
       var data: int = tile_data[x - x_start][y - y_start]
-      var tile_height: float = (data & 65535) / 10.0
+      var tile_height: float = (data & 0xffff) / 10.0
+      if tile_height > 6000:
+        print(tile_height)
+        tile_height = 0
       var tile := get_tile(x, y)
       
       if tile == null:
         tile = Tile.new(x, y, tile_height, data >> 24 & 255)
-        #tiles_container.add_child(tile)
+        tiles_container.add_child(tile)
         tiles[_get_tile_key(x, y)] = tile
       else:
         tile.set_height(tile_height)
-  logger.info('heights set after ' + str(Time.get_ticks_msec() - start_time) + 'msec')
+  logger.info('heights set after ' + str(Time.get_ticks_msec() - start_time) + 'msec - x: ' + str(x_start) + ' y: ' + str(y_start) + ' width: ' + str(width) + ' height: ' + str(height))
   
   for x in range(x_start - 1, x_start + width):
     for y in range(y_start - 1, y_start + height):
